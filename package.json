@@ -1,0 +1,39 @@
+{
+  "name": "queue-that",
+  "version": "1.0.0",
+  "description": "A queue managed in localStorage for async tasks that may run immediately before page unload.",
+  "main": "lib/queue-that.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/QubitDigital/queue-that.git"
+  },
+  "keywords": [
+    "queue"
+  ],
+  "author": "Rob Tod <roberttod@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/QubitDigital/queue-that/issues"
+  },
+  "homepage": "https://github.com/QubitDigital/queue-that#readme",
+  "dependencies": {
+    "json-bourne": "^1.0.0",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {
+    "karma": "^0.12.31",
+    "karma-browserify": "^4.1.2",
+    "karma-chrome-launcher": "^0.1.10",
+    "karma-expect": "^1.1.0",
+    "karma-mocha": "^0.1.10",
+    "karma-sinon": "^1.0.4",
+    "karma-spec-reporter": "0.0.19",
+    "mocha": "^2.2.4",
+    "proxyquireify-es3": "^1.2.3",
+    "sinon": "^1.14.1",
+    "standard": "^3.8.0"
+  }
+}
