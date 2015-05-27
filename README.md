@@ -49,7 +49,7 @@ q({
 - If `options.process` calls back with an error, the tasks will be passed to `options.process`
   again after a second. This backoff time doubles for each sequential error. The backoff timer is
   stored in localStorage and so will not reset when Queue That is reinitialised.
-- Tasks are batched with a default batch size of **50**. The option `batchSize` can be used to change
+- Tasks are batched with a default batch size of **20**. The option `batchSize` can be used to change
   the batch size. Disable batching by setting `batchSize` to `Infinity`.
 - The active queue polls localStorage every **100ms** for new tasks.
 - If the active queue does not poll for over **5 seconds**, the next tab to queue
