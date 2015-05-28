@@ -116,6 +116,7 @@ describe('createQueueThat', function () {
 
     it('should not read the queue while tasks are processing', function () {
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.getQueue.callCount).to.be(2)
 
       clock.tick(QUEUE_POLL_INTERVAL)
@@ -131,25 +132,40 @@ describe('createQueueThat', function () {
 
     it('should save tasks to the queue', function () {
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.setQueue.getCall(0).args[0]).to.eql(['A'])
     })
 
     it('should add tasks to the end of the queue', function () {
       adapter.getQueue.returns(['A'])
       queueThat('B')
+      clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.setQueue.callCount).to.be(1)
       expect(adapter.setQueue.getCall(0).args[0]).to.eql(['A', 'B'])
     })
 
-    it('should process synchronously', function () {
+    it('should group multiple tasks every ' + QUEUE_POLL_INTERVAL + 'ms', function () {
+      options.process = sinon.spy(function (task, done) {
+        done()
+      })
       adapter.setQueue(['A'])
       queueThat('B')
+      clock.tick(QUEUE_POLL_INTERVAL / 2)
+      queueThat('C')
+      clock.tick(QUEUE_POLL_INTERVAL / 2)
+
       expect(options.process.callCount).to.be(1)
-      expect(options.process.getCall(0).args[0]).to.eql(['A', 'B'])
+      expect(options.process.getCall(0).args[0]).to.eql(['A', 'B', 'C'])
+
+      queueThat('D')
+      clock.tick(QUEUE_POLL_INTERVAL)
+      expect(options.process.callCount).to.be(2)
+      expect(options.process.getCall(1).args[0]).to.eql(['D'])
     })
 
-    it('should not process new tasks added to the active queue until processing has finished ', function () {
+    it('should not process new tasks added to the active queue until processing has finished', function () {
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(['A'])
@@ -161,6 +177,7 @@ describe('createQueueThat', function () {
 
     it('should process new tasks added to the active queue after processing', function () {
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(['A'])
@@ -175,6 +192,7 @@ describe('createQueueThat', function () {
     it('should have a default batch size of 20', function () {
       adapter.setQueue(_.range(50))
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(20)
@@ -198,6 +216,7 @@ describe('createQueueThat', function () {
       options.batchSize = 10
       adapter.setQueue(_.range(14))
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(10)
@@ -213,6 +232,7 @@ describe('createQueueThat', function () {
       options.batchSize = Infinity
       adapter.setQueue(_.range(1000))
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(1001)
@@ -226,6 +246,7 @@ describe('createQueueThat', function () {
     it('should backoff exponentially on process error', function () {
       adapter.setQueue(_.range(4))
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
 
       options.process.getCall(0).args[1]('error')
       clock.tick(INITIAL_BACKOFF_TIME + QUEUE_POLL_INTERVAL)
@@ -268,6 +289,7 @@ describe('createQueueThat', function () {
       adapter.setErrorCount(1)
       expect(adapter.setBackoffTime.callCount).to.be(1)
       queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
 
       clock.tick(3000 + QUEUE_POLL_INTERVAL)
       expect(adapter.setBackoffTime.callCount).to.be(4)
