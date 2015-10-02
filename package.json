@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/QubitDigital/queue-that.git"
+    "url": "git+ssh://git@github.com/QubitProducts/queue-that.git"
   },
   "keywords": [
     "queue"
@@ -16,9 +16,9 @@
   "author": "Rob Tod <roberttod@gmail.com>",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/QubitDigital/queue-that/issues"
+    "url": "https://github.com/QubitProducts/queue-that/issues"
   },
-  "homepage": "https://github.com/QubitDigital/queue-that#readme",
+  "homepage": "https://github.com/QubitProducts/queue-that#readme",
   "dependencies": {
     "json-bourne": "^1.0.0",
     "underscore": "^1.8.3"
