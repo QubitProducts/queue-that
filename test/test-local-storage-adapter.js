@@ -14,15 +14,9 @@ var ERROR_COUNT_KEY = 'qb_error_count'
 describe('localStorageAdapter', function () {
   var json
   var clock
-  var originalNow
   var localStorageAdapter
 
   beforeEach(function () {
-    // _.now does not play well with sinon
-    originalNow = _.now
-    _.now = function () {
-      return (new Date()).getTime()
-    }
     clock = sinon.useFakeTimers()
     json = {
       parse: sinon.stub(),
@@ -35,7 +29,6 @@ describe('localStorageAdapter', function () {
   })
 
   afterEach(function () {
-    _.now = originalNow
     localStorage.clear()
     clock.restore()
   })
@@ -123,8 +116,12 @@ describe('localStorageAdapter', function () {
       expect(json.stringify.callCount).to.be(1)
       expect(json.stringify.getCall(0).args[0]).to.eql({
         id: 'the active queue id',
-        ts: _.now()
+        ts: now()
       })
     })
   })
 })
+
+function now () {
+  return (new Date()).getTime()
+}

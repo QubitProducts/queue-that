@@ -13,13 +13,7 @@ describe('createQueueThat', function () {
   var createAdapter
   var adapter
   var clock
-  var originalNow
   beforeEach(function () {
-    // _.now does not play well with sinon
-    originalNow = _.now
-    _.now = function () {
-      return (new Date()).getTime()
-    }
     clock = sinon.useFakeTimers(1000)
 
     adapter = {
@@ -39,7 +33,7 @@ describe('createQueueThat', function () {
       setActiveQueue: sinon.spy(function (id) {
         adapter.getActiveQueue.returns({
           id: id,
-          ts: _.now()
+          ts: now()
         })
       })
     }
@@ -56,7 +50,6 @@ describe('createQueueThat', function () {
       }
     })
     clock.restore()
-    _.now = originalNow
   })
 
   it('should require a process option', function () {
@@ -80,12 +73,12 @@ describe('createQueueThat', function () {
     it('should not change the active queue if the active queue hasn\'t expired', function () {
       adapter.getActiveQueue.returns({
         id: '123',
-        ts: _.now()
+        ts: now()
       })
       queueThat('A')
       adapter.getActiveQueue.returns({
         id: '123',
-        ts: _.now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
+        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
       })
       queueThat('A')
       expect(adapter.setActiveQueue.callCount).to.be(0)
@@ -99,7 +92,7 @@ describe('createQueueThat', function () {
     it('should change the active queue if the active queue has expired', function () {
       adapter.getActiveQueue.returns({
         id: 123,
-        ts: _.now() - ACTIVE_QUEUE_EXPIRE_TIME
+        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
       })
       queueThat('A')
       expect(adapter.setActiveQueue.callCount).to.be(1)
@@ -300,3 +293,7 @@ describe('createQueueThat', function () {
     })
   })
 })
+
+function now () {
+  return (new Date()).getTime()
+}

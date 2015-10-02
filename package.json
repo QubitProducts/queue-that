@@ -21,7 +21,7 @@
   "homepage": "https://github.com/QubitProducts/queue-that#readme",
   "dependencies": {
     "json-bourne": "^1.0.0",
-    "underscore": "^1.8.3"
+    "underscore": "1.5.2"
   },
   "devDependencies": {
     "karma": "^0.12.31",
