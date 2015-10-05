@@ -5,7 +5,7 @@ var sinon = require('sinon')
 var proxyquire = require('proxyquireify-es3')(require)
 
 var QUEUE_POLL_INTERVAL = 100
-var ACTIVE_QUEUE_EXPIRE_TIME = 5000
+var ACTIVE_QUEUE_EXPIRE_TIME = 3000
 var INITIAL_BACKOFF_TIME = 1000
 
 describe('createQueueThat', function () {
@@ -71,35 +71,56 @@ describe('createQueueThat', function () {
     })
 
     it('should not change the active queue if the active queue hasn\'t expired', function () {
-      adapter.getActiveQueue.returns({
-        id: '123',
-        ts: now()
-      })
+      adapter.getActiveQueue = function () {
+        return {
+          id: '123',
+          ts: now()
+        }
+      }
       queueThat('A')
-      adapter.getActiveQueue.returns({
-        id: '123',
-        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
-      })
+      adapter.getActiveQueue = function () {
+        return {
+          id: '123',
+          ts: now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
+        }
+      }
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       expect(adapter.setActiveQueue.callCount).to.be(0)
     })
 
     it('should change the active queue if there is not an active queue defined', function () {
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       expect(adapter.setActiveQueue.callCount).to.be(1)
     })
 
-    it('should change the active queue if the active queue has expired', function () {
-      adapter.getActiveQueue.returns({
-        id: 123,
-        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
-      })
+    it('should not change the active queue until waiting ACTIVE_QUEUE_EXPIRE_TIME', function () {
       queueThat('A')
-      expect(adapter.setActiveQueue.callCount).to.be(1)
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME - 1)
+      expect(adapter.setActiveQueue.callCount).to.be(0)
+    })
+
+    it('should change the active queue if the active queue has expired', function () {
+      adapter.getActiveQueue = function () {
+        return {
+          id: 123,
+          ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
+        }
+      }
+      queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME - 1)
+      expect(adapter.setActiveQueue.callCount).to.be(0)
     })
 
     it('should continue updating the active timestamp', function () {
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       expect(adapter.setActiveQueue.callCount).to.be(1)
       clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.setActiveQueue.callCount).to.be(2)
@@ -109,6 +130,8 @@ describe('createQueueThat', function () {
 
     it('should not read the queue while tasks are processing', function () {
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.getQueue.callCount).to.be(2)
 
@@ -125,12 +148,16 @@ describe('createQueueThat', function () {
 
     it('should save tasks to the queue', function () {
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.setQueue.getCall(0).args[0]).to.eql(['A'])
     })
 
     it('should add tasks to the end of the queue', function () {
       adapter.getQueue.returns(['A'])
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       queueThat('B')
       clock.tick(QUEUE_POLL_INTERVAL)
       expect(adapter.setQueue.callCount).to.be(1)
@@ -143,6 +170,8 @@ describe('createQueueThat', function () {
       })
       adapter.setQueue(['A'])
       queueThat('B')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL / 2)
       queueThat('C')
       clock.tick(QUEUE_POLL_INTERVAL / 2)
@@ -157,9 +186,13 @@ describe('createQueueThat', function () {
     })
 
     it('should not process new tasks added to the active queue until processing has finished', function () {
+
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
+
       queueThat('B')
+
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(['A'])
 
@@ -170,7 +203,9 @@ describe('createQueueThat', function () {
 
     it('should process new tasks added to the active queue after processing', function () {
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
+
       queueThat('B')
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(['A'])
@@ -184,7 +219,9 @@ describe('createQueueThat', function () {
 
     it('should have a default batch size of 20', function () {
       adapter.setQueue(_.range(50))
+
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
@@ -209,6 +246,7 @@ describe('createQueueThat', function () {
       options.batchSize = 10
       adapter.setQueue(_.range(14))
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
@@ -225,6 +263,7 @@ describe('createQueueThat', function () {
       options.batchSize = Infinity
       adapter.setQueue(_.range(1000))
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
@@ -239,6 +278,7 @@ describe('createQueueThat', function () {
     it('should backoff exponentially on process error', function () {
       adapter.setQueue(_.range(4))
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       options.process.getCall(0).args[1]('error')
@@ -255,9 +295,10 @@ describe('createQueueThat', function () {
     })
 
     it('should use localStorage as the back off timer', function () {
-      adapter.setBackoffTime(3000)
+      adapter.setBackoffTime(ACTIVE_QUEUE_EXPIRE_TIME + now() + 3000)
       adapter.setErrorCount(3)
       queueThat('A')
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
 
       clock.tick(2999)
       expect(options.process.callCount).to.be(0)
@@ -267,7 +308,7 @@ describe('createQueueThat', function () {
 
       options.process.getCall(0).args[1]('error')
       expect(adapter.setErrorCount.withArgs(4).callCount).to.be(1)
-      expect(adapter.setBackoffTime.withArgs(INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
+      expect(adapter.setBackoffTime.withArgs(now() + INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
@@ -277,19 +318,25 @@ describe('createQueueThat', function () {
       expect(adapter.setErrorCount.withArgs(0).callCount).to.be(1)
     })
 
-    it('should not poll backoff when options.process succeeds', function () {
-      adapter.setBackoffTime(3000)
+    it('should not increment backoff when options.process succeeds', function () {
+      adapter.setBackoffTime(now() + ACTIVE_QUEUE_EXPIRE_TIME + QUEUE_POLL_INTERVAL + 3000)
       adapter.setErrorCount(1)
-      expect(adapter.setBackoffTime.callCount).to.be(1)
       queueThat('A')
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       clock.tick(3000 + QUEUE_POLL_INTERVAL)
-      expect(adapter.setBackoffTime.callCount).to.be(4)
+      expect(options.process.callCount).to.be(1)
+      expect(adapter.setBackoffTime.callCount).to.be(1)
+
+      /**
+       * Success.
+       */
       options.process.getCall(0).args[1]()
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 6))
-      expect(adapter.setBackoffTime.callCount).to.be(4)
+      expect(adapter.setBackoffTime.callCount).to.be(1)
     })
   })
 })
