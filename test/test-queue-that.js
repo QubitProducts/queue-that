@@ -295,7 +295,7 @@ describe('createQueueThat', function () {
     })
 
     it('should use localStorage as the back off timer', function () {
-      adapter.setBackoffTime(3000)
+      adapter.setBackoffTime(ACTIVE_QUEUE_EXPIRE_TIME + now() + 3000)
       adapter.setErrorCount(3)
       queueThat('A')
       clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
@@ -308,7 +308,7 @@ describe('createQueueThat', function () {
 
       options.process.getCall(0).args[1]('error')
       expect(adapter.setErrorCount.withArgs(4).callCount).to.be(1)
-      expect(adapter.setBackoffTime.withArgs(INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
+      expect(adapter.setBackoffTime.withArgs(now() + INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
@@ -318,20 +318,25 @@ describe('createQueueThat', function () {
       expect(adapter.setErrorCount.withArgs(0).callCount).to.be(1)
     })
 
-    it('should not poll backoff when options.process succeeds', function () {
-      adapter.setBackoffTime(3000)
+    it('should not increment backoff when options.process succeeds', function () {
+      adapter.setBackoffTime(now() + ACTIVE_QUEUE_EXPIRE_TIME + QUEUE_POLL_INTERVAL + 3000)
       adapter.setErrorCount(1)
-      expect(adapter.setBackoffTime.callCount).to.be(1)
       queueThat('A')
+
       clock.tick(ACTIVE_QUEUE_EXPIRE_TIME)
       clock.tick(QUEUE_POLL_INTERVAL)
 
       clock.tick(3000 + QUEUE_POLL_INTERVAL)
-      expect(adapter.setBackoffTime.callCount).to.be(4)
+      expect(options.process.callCount).to.be(1)
+      expect(adapter.setBackoffTime.callCount).to.be(1)
+
+      /**
+       * Success.
+       */
       options.process.getCall(0).args[1]()
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 6))
-      expect(adapter.setBackoffTime.callCount).to.be(4)
+      expect(adapter.setBackoffTime.callCount).to.be(1)
     })
   })
 })
