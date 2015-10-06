@@ -5,7 +5,7 @@ var sinon = require('sinon')
 var proxyquire = require('proxyquireify-es3')(require)
 
 var QUEUE_POLL_INTERVAL = 100
-var ACTIVE_QUEUE_EXPIRE_TIME = 5000
+var ACTIVE_QUEUE_EXPIRE_TIME = 3000
 var INITIAL_BACKOFF_TIME = 1000
 
 describe('createQueueThat', function () {
@@ -95,6 +95,19 @@ describe('createQueueThat', function () {
         ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
       })
       queueThat('A')
+      expect(adapter.setActiveQueue.callCount).to.be(1)
+    })
+
+    it('should check the active queue ACTIVE_QUEUE_EXPIRE_TIME after initialisation', function () {
+      adapter.getActiveQueue.returns({
+        id: 123,
+        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
+      })
+
+      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME - 1)
+      expect(adapter.setActiveQueue.callCount).to.be(0)
+
+      clock.tick(1)
       expect(adapter.setActiveQueue.callCount).to.be(1)
     })
 
