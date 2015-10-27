@@ -11,11 +11,18 @@ var queueThat = require('queue-that')
 var post = require('post')
 var when = require('when')
 
-/**
- * The queue will not process any more events
- * until done is called.
- */
 var q = queueThat({
+  /**
+   * Default is 'Queue That'. This label is
+   * used to store the queue in localStorage.
+   * If there are more than one queues, unique
+   * labels are required separate them.
+   */
+  label: 'Events',
+  /**
+   * The queue will not process any more events
+   * until done is called.
+   */
   process: function (items, done) {
     when.all(
       items.map(post.bind(null, 'https://somewhere.com/events'))

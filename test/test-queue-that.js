@@ -57,6 +57,15 @@ describe('createQueueThat', function () {
       process: sinon.stub()
     }).to.not.throwException()
     expect(createQueueThat).withArgs({}).to.throwException()
+    expect(createAdapter.withArgs('Queue That').callCount).to.be(1)
+  })
+
+  it('should create an adapter with the label option', function () {
+    createQueueThat({
+      process: sinon.stub(),
+      label: 'A label'
+    })
+    expect(createAdapter.withArgs('A label').callCount).to.be(1)
   })
 
   describe('queueThat', function () {

@@ -6,15 +6,14 @@ var sinon = require('sinon')
 
 var localStorage = window.localStorage
 
-var QUEUE_KEY = 'qb_queue'
-var ACTIVE_QUEUE_KEY = 'qb_active_queue'
-var BACKOFF_TIME_KEY = 'qb_backoff_time'
-var ERROR_COUNT_KEY = 'qb_error_count'
-
 describe('localStorageAdapter', function () {
   var json
   var clock
   var localStorageAdapter
+  var QUEUE_KEY
+  var ACTIVE_QUEUE_KEY
+  var BACKOFF_TIME_KEY
+  var ERROR_COUNT_KEY
 
   beforeEach(function () {
     clock = sinon.useFakeTimers()
@@ -25,7 +24,11 @@ describe('localStorageAdapter', function () {
     var createLocalStorageAdapter = proxyquire('../lib/local-storage-adapter', {
       'json-bourne': json
     })
-    localStorageAdapter = createLocalStorageAdapter()
+    localStorageAdapter = createLocalStorageAdapter('Some Name')
+    QUEUE_KEY = 'Some Name - Queue'
+    ACTIVE_QUEUE_KEY = 'Some Name - Active Queue'
+    BACKOFF_TIME_KEY = 'Some Name - Backoff Time'
+    ERROR_COUNT_KEY = 'Some Name - Error Count'
   })
 
   afterEach(function () {
