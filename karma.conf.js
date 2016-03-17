@@ -1,29 +1,25 @@
 module.exports = function (config) {
   config.set({
     basePath: '',
-    frameworks: ['mocha', 'browserify', 'expect', 'sinon'],
+    frameworks: ['mocha', 'expect', 'sinon'],
     files: [
-      './node_modules/sinon/pkg/sinon-timers-ie-1.14.1.js',
-      {
-        pattern: 'test/*.js',
-        watched: false,
-        included: true,
-        served: true
-      }
+      './node_modules/sinon/pkg/sinon-timers-ie.js',
+      'test/*.js'
     ],
     exclude: [
       'karma.conf.js'
     ],
     preprocessors: {
-      'test/*.js': ['browserify'],
-      'lib/*.js': ['browserify']
-    },
-    browserify: {
-      debug: true,
-      plugin: ['proxyquireify-es3/plugin']
+      'test/*.js': ['webpack', 'sourcemap']
     },
     reporters: ['spec'],
     logLevel: config.LOG_INFO,
-    browsers: ['Chrome']
+    browsers: ['Chrome'],
+    webpack: {
+      devtool: 'inline-source-map'
+    },
+    webpackServer: {
+      noInfo: true
+    }
   })
 }

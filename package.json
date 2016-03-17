@@ -24,16 +24,17 @@
     "underscore": "1.5.2"
   },
   "devDependencies": {
-    "karma": "^0.12.31",
-    "karma-browserify": "^4.1.2",
-    "karma-chrome-launcher": "^0.1.10",
-    "karma-expect": "^1.1.0",
-    "karma-mocha": "^0.1.10",
+    "inject-loader": "^2.0.1",
+    "karma": "^0.13.15",
+    "karma-expect": "^1.1.1",
+    "karma-firefox-launcher": "^0.1.7",
+    "karma-mocha": "^0.2.1",
     "karma-sinon": "^1.0.4",
-    "karma-spec-reporter": "0.0.19",
-    "mocha": "^2.2.4",
-    "proxyquireify-es3": "^1.2.3",
-    "sinon": "^1.14.1",
-    "standard": "^3.8.0"
+    "karma-sourcemap-loader": "^0.3.6",
+    "karma-spec-reporter": "0.0.23",
+    "karma-webpack": "^1.7.0",
+    "sinon": "^1.17.3",
+    "standard": "^6.0.8",
+    "webpack": "^1.12.9"
   }
 }
