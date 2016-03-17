@@ -1,8 +1,7 @@
-/* global describe, it, expect, beforeEach, afterEach */
+/* global describe, it, expect, beforeEach, afterEach, sinon */
 
 var _ = require('underscore')
-var sinon = require('sinon')
-var proxyquire = require('proxyquireify-es3')(require)
+var createQueueThatInjector = require('inject!../lib/queue-that')
 
 var QUEUE_POLL_INTERVAL = 100
 var ACTIVE_QUEUE_EXPIRE_TIME = 3000
@@ -38,7 +37,7 @@ describe('createQueueThat', function () {
       })
     }
     createAdapter = sinon.stub().returns(adapter)
-    createQueueThat = sinon.spy(proxyquire('../lib/queue-that', {
+    createQueueThat = sinon.spy(createQueueThatInjector({
       './local-storage-adapter': createAdapter
     }))
   })

@@ -1,8 +1,7 @@
-/* global describe, it, expect, beforeEach, afterEach */
+/* global describe, it, expect, beforeEach, afterEach, sinon */
 
 var _ = require('underscore')
-var proxyquire = require('proxyquireify-es3')(require)
-var sinon = require('sinon')
+var adapterInjector = require('inject!../lib/local-storage-adapter')
 
 var localStorage = window.localStorage
 
@@ -21,7 +20,7 @@ describe('localStorageAdapter', function () {
       parse: sinon.stub(),
       stringify: sinon.stub()
     }
-    var createLocalStorageAdapter = proxyquire('../lib/local-storage-adapter', {
+    var createLocalStorageAdapter = adapterInjector({
       'json-bourne': json
     })
     localStorageAdapter = createLocalStorageAdapter('Some Name')
