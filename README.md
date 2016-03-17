@@ -1,6 +1,10 @@
 Queue That
 ----------
 
+[![js-standard-style](https://cdn.rawgit.com/feross/standard/master/badge.svg)](https://github.com/feross/standard)
+
+[ ![Codeship Status for qubitdigital/jolt](https://codeship.com/projects/1ef92b10-ceb4-0133-7c75-664cd4c01036/status?branch=master)](https://codeship.com/projects/141036)
+
 A queue managed in localStorage for async tasks that may run immediately before page unload.
 Queue That is built primarily to queue XHR requests for reporting.
 
