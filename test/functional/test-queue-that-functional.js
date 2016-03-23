@@ -1,4 +1,5 @@
 /* global describe, it, expect, beforeEach, afterEach, sinon */
+var _ = require('underscore')
 var createQueueThat = require('../../lib/queue-that')
 
 describe('queueThat (functional)', function () {
@@ -210,5 +211,43 @@ describe('queueThat (functional)', function () {
         done()
       }
     }
+  })
+
+  it('should trim tasks', function (done) {
+    queueThat.options.trim = function (items) {
+      return _.filter(items, function (item) {
+        return item.task !== 'b'
+      })
+    }
+
+    queueThat.options.process = sinon.spy(function (items, next) {
+      expect(items).to.eql([{
+        task: 'a'
+      }, {
+        task: 'c'
+      }])
+      next()
+      done()
+    })
+
+    queueThat({
+      task: 'a'
+    })
+
+    queueThat({
+      task: 'b'
+    })
+
+    setTimeout(function () {
+      queueThat({
+        task: 'b'
+      })
+      queueThat({
+        task: 'b'
+      })
+      queueThat({
+        task: 'c'
+      })
+    }, 10)
   })
 })

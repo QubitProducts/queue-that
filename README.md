@@ -31,6 +31,15 @@ var q = queueThat({
     when.all(
       items.map(post.bind(null, 'https://somewhere.com/events'))
     ).then(done)
+  },
+  /**
+   * Every time the queue is set, this setter will be called.
+   * Good for reducing the queue size if it gets too long.
+   */
+  trim: function (items) {
+    return items.filter(function (item) {
+      return item !== 'Low priority'
+    })
   }
 })
 
@@ -65,6 +74,9 @@ q({
 - The active queue polls localStorage every **100ms** for new tasks.
 - If the active queue does not poll for over **5 seconds**, the next tab to queue
   a process will become the active queue.
+- Falls back to `window.__queueThat__` variable if localStorage throws or doesn't work.
+- Optional trim function that will be called as a setter every time the queue is set. This is good for
+  when the queue is taking up a lot of localStorage or if JSON parsing/stringifying becomes slow.
 
 ### Support
 
