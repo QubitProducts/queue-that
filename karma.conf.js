@@ -4,17 +4,17 @@ module.exports = function (config) {
     frameworks: ['mocha', 'expect', 'sinon'],
     files: [
       './node_modules/sinon/pkg/sinon-timers-ie.js',
-      'test/*.js'
+      'test/**/test-*.js'
     ],
     exclude: [
       'karma.conf.js'
     ],
     preprocessors: {
-      'test/*.js': ['webpack', 'sourcemap']
+      'test/**/test-*.js': ['webpack', 'sourcemap']
     },
     reporters: ['spec'],
     logLevel: config.LOG_INFO,
-    browsers: ['Firefox'],
+    browsers: ['PhantomJS'],
     webpack: {
       devtool: 'inline-source-map'
     },

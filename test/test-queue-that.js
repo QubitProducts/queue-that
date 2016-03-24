@@ -9,36 +9,21 @@ var INITIAL_BACKOFF_TIME = 1000
 
 describe('createQueueThat', function () {
   var createQueueThat
-  var createAdapter
-  var adapter
+  var createLocalStorageAdapter
+  var createGlobalVariableAdapter
+  var localStorageAdapter
+  var globalVariableAdapter
   var clock
   beforeEach(function () {
     clock = sinon.useFakeTimers(1000)
 
-    adapter = {
-      getQueue: sinon.stub().returns([]),
-      setQueue: sinon.spy(function (q) {
-        adapter.getQueue.returns(q)
-      }),
-      getErrorCount: sinon.stub().returns(0),
-      getBackoffTime: sinon.stub().returns(0),
-      setErrorCount: sinon.spy(function (n) {
-        adapter.getErrorCount.returns(n)
-      }),
-      setBackoffTime: sinon.spy(function (t) {
-        adapter.getBackoffTime.returns(t)
-      }),
-      getActiveQueue: sinon.stub(),
-      setActiveQueue: sinon.spy(function (id) {
-        adapter.getActiveQueue.returns({
-          id: id,
-          ts: now()
-        })
-      })
-    }
-    createAdapter = sinon.stub().returns(adapter)
+    localStorageAdapter = createAdapter()
+    createLocalStorageAdapter = sinon.stub().returns(localStorageAdapter)
+    globalVariableAdapter = createAdapter()
+    createGlobalVariableAdapter = sinon.stub().returns(globalVariableAdapter)
     createQueueThat = sinon.spy(createQueueThatInjector({
-      './local-storage-adapter': createAdapter
+      './local-storage-adapter': createLocalStorageAdapter,
+      './global-variable-adapter': createGlobalVariableAdapter
     }))
   })
 
@@ -56,15 +41,29 @@ describe('createQueueThat', function () {
       process: sinon.stub()
     }).to.not.throwException()
     expect(createQueueThat).withArgs({}).to.throwException()
-    expect(createAdapter.withArgs('Queue That').callCount).to.be(1)
+    expect(createLocalStorageAdapter.withArgs('Queue That').callCount).to.be(1)
   })
 
   it('should create an adapter with the label option', function () {
-    createQueueThat({
+    var queueThat = createQueueThat({
       process: sinon.stub(),
       label: 'A label'
     })
-    expect(createAdapter.withArgs('A label').callCount).to.be(1)
+
+    expect(createLocalStorageAdapter.withArgs('A label').callCount).to.be(1)
+    expect(createGlobalVariableAdapter.withArgs('A label').callCount).to.be(0)
+    expect(queueThat.storageAdapter).to.be(localStorageAdapter)
+  })
+
+  it('should use the global variable adapter if localStorage does not work', function () {
+    localStorageAdapter.works.returns(false)
+    var queueThat = createQueueThat({
+      process: sinon.stub(),
+      label: 'A label'
+    })
+
+    expect(createGlobalVariableAdapter.withArgs('A label').callCount).to.be(1)
+    expect(queueThat.storageAdapter).to.be(globalVariableAdapter)
   })
 
   describe('queueThat', function () {
@@ -79,90 +78,90 @@ describe('createQueueThat', function () {
     })
 
     it('should not change the active queue if the active queue hasn\'t expired', function () {
-      adapter.getActiveQueue.returns({
+      localStorageAdapter.getActiveQueue.returns({
         id: '123',
         ts: now()
       })
       queueThat('A')
-      adapter.getActiveQueue.returns({
+      localStorageAdapter.getActiveQueue.returns({
         id: '123',
         ts: now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
       })
       queueThat('A')
-      expect(adapter.setActiveQueue.callCount).to.be(0)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(0)
     })
 
     it('should change the active queue if there is not an active queue defined', function () {
       queueThat('A')
-      expect(adapter.setActiveQueue.callCount).to.be(1)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
     })
 
     it('should change the active queue if the active queue has expired', function () {
-      adapter.getActiveQueue.returns({
+      localStorageAdapter.getActiveQueue.returns({
         id: 123,
         ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
       })
       queueThat('A')
-      expect(adapter.setActiveQueue.callCount).to.be(1)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
     })
 
     it('should check the active queue ACTIVE_QUEUE_EXPIRE_TIME after initialisation', function () {
-      adapter.getActiveQueue.returns({
+      localStorageAdapter.getActiveQueue.returns({
         id: 123,
         ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
       })
 
       clock.tick(ACTIVE_QUEUE_EXPIRE_TIME - 1)
-      expect(adapter.setActiveQueue.callCount).to.be(0)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(0)
 
       clock.tick(1)
-      expect(adapter.setActiveQueue.callCount).to.be(1)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
     })
 
     it('should continue updating the active timestamp', function () {
       queueThat('A')
-      expect(adapter.setActiveQueue.callCount).to.be(1)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.setActiveQueue.callCount).to.be(2)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(2)
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.setActiveQueue.callCount).to.be(3)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(3)
     })
 
     it('should not read the queue while tasks are processing', function () {
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.getQueue.callCount).to.be(2)
+      expect(localStorageAdapter.getQueue.callCount).to.be(2)
 
       clock.tick(QUEUE_POLL_INTERVAL)
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.getQueue.callCount).to.be(2)
+      expect(localStorageAdapter.getQueue.callCount).to.be(2)
 
       options.process.getCall(0).args[1]()
-      expect(adapter.getQueue.callCount).to.be(3)
+      expect(localStorageAdapter.getQueue.callCount).to.be(3)
 
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.getQueue.callCount).to.be(4)
+      expect(localStorageAdapter.getQueue.callCount).to.be(4)
     })
 
     it('should save tasks to the queue', function () {
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.setQueue.getCall(0).args[0]).to.eql(['A'])
+      expect(localStorageAdapter.setQueue.getCall(0).args[0]).to.eql(['A'])
     })
 
     it('should add tasks to the end of the queue', function () {
-      adapter.getQueue.returns(['A'])
+      localStorageAdapter.getQueue.returns(['A'])
       queueThat('B')
       clock.tick(QUEUE_POLL_INTERVAL)
-      expect(adapter.setQueue.callCount).to.be(1)
-      expect(adapter.setQueue.getCall(0).args[0]).to.eql(['A', 'B'])
+      expect(localStorageAdapter.setQueue.callCount).to.be(1)
+      expect(localStorageAdapter.setQueue.getCall(0).args[0]).to.eql(['A', 'B'])
     })
 
     it('should group multiple tasks every ' + QUEUE_POLL_INTERVAL + 'ms', function () {
       options.process = sinon.spy(function (task, done) {
         done()
       })
-      adapter.setQueue(['A'])
+      localStorageAdapter.setQueue(['A'])
       queueThat('B')
       clock.tick(QUEUE_POLL_INTERVAL / 2)
       queueThat('C')
@@ -204,7 +203,7 @@ describe('createQueueThat', function () {
     })
 
     it('should have a default batch size of 20', function () {
-      adapter.setQueue(_.range(50))
+      localStorageAdapter.setQueue(_.range(50))
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
 
@@ -228,7 +227,7 @@ describe('createQueueThat', function () {
 
     it('should use a custom batch size option', function () {
       options.batchSize = 10
-      adapter.setQueue(_.range(14))
+      localStorageAdapter.setQueue(_.range(14))
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
 
@@ -244,7 +243,7 @@ describe('createQueueThat', function () {
 
     it('should allow an unlimited batch size option', function () {
       options.batchSize = Infinity
-      adapter.setQueue(_.range(1000))
+      localStorageAdapter.setQueue(_.range(1000))
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
 
@@ -258,7 +257,7 @@ describe('createQueueThat', function () {
     })
 
     it('should backoff exponentially on process error', function () {
-      adapter.setQueue(_.range(4))
+      localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
 
@@ -276,8 +275,8 @@ describe('createQueueThat', function () {
     })
 
     it('should use localStorage as the back off timer', function () {
-      adapter.setBackoffTime(now() + 3000)
-      adapter.setErrorCount(3)
+      localStorageAdapter.setBackoffTime(now() + 3000)
+      localStorageAdapter.setErrorCount(3)
       queueThat('A')
 
       clock.tick(2999)
@@ -287,35 +286,61 @@ describe('createQueueThat', function () {
       expect(options.process.callCount).to.be(1)
 
       options.process.getCall(0).args[1]('error')
-      expect(adapter.setErrorCount.withArgs(4).callCount).to.be(1)
-      expect(adapter.setBackoffTime.withArgs(now() + INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
+      expect(localStorageAdapter.setErrorCount.withArgs(4).callCount).to.be(1)
+      expect(localStorageAdapter.setBackoffTime.withArgs(now() + INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
 
       options.process.getCall(1).args[1]()
 
-      expect(adapter.setErrorCount.withArgs(0).callCount).to.be(1)
+      expect(localStorageAdapter.setErrorCount.withArgs(0).callCount).to.be(1)
     })
 
     it('should not increment backoff when options.process succeeds', function () {
-      adapter.setBackoffTime(now() + 3000)
-      adapter.setErrorCount(1)
+      localStorageAdapter.setBackoffTime(now() + 3000)
+      localStorageAdapter.setErrorCount(1)
 
-      expect(adapter.setBackoffTime.callCount).to.be(1)
+      expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
       queueThat('A')
       clock.tick(QUEUE_POLL_INTERVAL)
 
       clock.tick(3000 + QUEUE_POLL_INTERVAL)
-      expect(adapter.setBackoffTime.callCount).to.be(1)
+      expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
       options.process.getCall(0).args[1]()
 
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 6))
-      expect(adapter.setBackoffTime.callCount).to.be(1)
+      expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
     })
   })
 })
 
 function now () {
   return (new Date()).getTime()
+}
+
+function createAdapter () {
+  var adapter = {
+    getQueue: sinon.stub().returns([]),
+    setQueue: sinon.spy(function (q) {
+      adapter.getQueue.returns(q)
+    }),
+    getErrorCount: sinon.stub().returns(0),
+    getBackoffTime: sinon.stub().returns(0),
+    setErrorCount: sinon.spy(function (n) {
+      adapter.getErrorCount.returns(n)
+    }),
+    setBackoffTime: sinon.spy(function (t) {
+      adapter.getBackoffTime.returns(t)
+    }),
+    getActiveQueue: sinon.stub(),
+    setActiveQueue: sinon.spy(function (id) {
+      adapter.getActiveQueue.returns({
+        id: id,
+        ts: now()
+      })
+    }),
+    works: sinon.stub().returns(true)
+  }
+  return adapter
 }

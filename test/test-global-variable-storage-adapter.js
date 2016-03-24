@@ -1,21 +1,13 @@
 /* global describe, it, expect, beforeEach, afterEach, sinon */
 
 var _ = require('underscore')
+var globalVariableInjector = require('inject!../lib/global-variable-adapter')
 var adapterInjector = require('inject!../lib/local-storage-adapter')
 
-var localStorage = window.localStorage
-
-var spec = describe
-try {
-  localStorage.a = 'b'
-} catch (e) {
-  spec = describe.skip
-}
-
-spec('localStorageAdapter', function () {
+describe('globalVariableAdapter', function () {
   var json
   var clock
-  var localStorageAdapter
+  var globalVariableAdapter
   var QUEUE_KEY
   var ACTIVE_QUEUE_KEY
   var BACKOFF_TIME_KEY
@@ -30,7 +22,10 @@ spec('localStorageAdapter', function () {
     var createLocalStorageAdapter = adapterInjector({
       'json-bourne': json
     })
-    localStorageAdapter = createLocalStorageAdapter('Some Name')
+    var createGlobalVariableAdapter = globalVariableInjector({
+      './local-storage-adapter': createLocalStorageAdapter
+    })
+    globalVariableAdapter = createGlobalVariableAdapter('Some Name')
     QUEUE_KEY = 'Some Name - Queue'
     ACTIVE_QUEUE_KEY = 'Some Name - Active Queue'
     BACKOFF_TIME_KEY = 'Some Name - Backoff Time'
@@ -38,27 +33,8 @@ spec('localStorageAdapter', function () {
   })
 
   afterEach(function () {
-    localStorage.clear()
+    delete window.__queueThat__
     clock.restore()
-  })
-
-  describe('works', function () {
-    it('should return false if saving throws', function () {
-      localStorageAdapter.save = function () {
-        throw new Error('I ain\'t havin no data today m8.')
-      }
-
-      expect(localStorageAdapter.works).to.not.throwError()
-      expect(localStorageAdapter.works()).to.be(false)
-    })
-    it('should return false if saving does not persist', function () {
-      localStorageAdapter.save = sinon.stub()
-
-      expect(localStorageAdapter.works()).to.be(false)
-    })
-    it('should return true if saving persists', function () {
-      expect(localStorageAdapter.works()).to.be(true)
-    })
   })
 
   describe('getQueue', function () {
@@ -66,10 +42,10 @@ spec('localStorageAdapter', function () {
     beforeEach(function () {
       data = ['a', 'b']
       json.parse.returns(data)
-      localStorage[QUEUE_KEY] = 'the data'
+      window.__queueThat__[QUEUE_KEY] = 'the data'
     })
     it('should get the queue array', function () {
-      expect(localStorageAdapter.getQueue(data)).to.eql(data)
+      expect(globalVariableAdapter.getQueue(data)).to.eql(data)
       expect(json.parse.callCount).to.be(1)
       expect(json.parse.getCall(0).args[0]).to.be('the data')
     })
@@ -79,9 +55,9 @@ spec('localStorageAdapter', function () {
     it('should set the queue array', function () {
       var queue = _.range(5)
       json.stringify.returns('the queue')
-      localStorageAdapter.setQueue(queue)
+      globalVariableAdapter.setQueue(queue)
 
-      expect(localStorage[QUEUE_KEY]).to.be('the queue')
+      expect(window.__queueThat__[QUEUE_KEY]).to.be('the queue')
       expect(json.stringify.callCount).to.be(1)
       expect(json.stringify.getCall(0).args[0]).to.be(queue)
     })
@@ -89,47 +65,47 @@ spec('localStorageAdapter', function () {
 
   describe('getErrorCount', function () {
     it('should return 0 when undefined', function () {
-      expect(localStorageAdapter.getErrorCount()).to.be(0)
+      expect(globalVariableAdapter.getErrorCount()).to.be(0)
     })
     it('should get the error count', function () {
-      localStorage[ERROR_COUNT_KEY] = '1'
-      expect(localStorageAdapter.getErrorCount()).to.be(1)
+      window.__queueThat__[ERROR_COUNT_KEY] = 1
+      expect(globalVariableAdapter.getErrorCount()).to.be(1)
     })
   })
 
   describe('getBackoffTime', function () {
     it('should return 0 when undefined', function () {
-      expect(localStorageAdapter.getBackoffTime()).to.be(0)
+      expect(globalVariableAdapter.getBackoffTime()).to.be(0)
     })
     it('should get the backoff time', function () {
-      localStorage[BACKOFF_TIME_KEY] = '1'
-      expect(localStorageAdapter.getBackoffTime()).to.be(1)
+      window.__queueThat__[BACKOFF_TIME_KEY] = 1
+      expect(globalVariableAdapter.getBackoffTime()).to.be(1)
     })
   })
 
   describe('setErrorCount', function () {
     it('should set the error count', function () {
-      localStorageAdapter.setErrorCount(5)
-      expect(localStorage[ERROR_COUNT_KEY]).to.be('5')
+      globalVariableAdapter.setErrorCount(5)
+      expect(window.__queueThat__[ERROR_COUNT_KEY]).to.be('5')
     })
   })
 
   describe('setBackoffTime', function () {
     it('should set the backoff time', function () {
-      localStorageAdapter.setBackoffTime(5)
-      expect(localStorage[BACKOFF_TIME_KEY]).to.be('5')
+      globalVariableAdapter.setBackoffTime(5)
+      expect(window.__queueThat__[BACKOFF_TIME_KEY]).to.be('5')
     })
   })
 
   describe('getActiveQueue', function () {
     it('should return undefined when undefined', function () {
-      expect(localStorageAdapter.getActiveQueue()).to.be(undefined)
+      expect(globalVariableAdapter.getActiveQueue()).to.be(undefined)
     })
     it('should return the parsed active queue details', function () {
-      localStorage[ACTIVE_QUEUE_KEY] = 'the stringified details'
+      window.__queueThat__[ACTIVE_QUEUE_KEY] = 'the stringified details'
       json.parse.returns('the parsed details')
 
-      expect(localStorageAdapter.getActiveQueue()).to.be('the parsed details')
+      expect(globalVariableAdapter.getActiveQueue()).to.be('the parsed details')
       expect(json.parse.callCount).to.be(1)
       expect(json.parse.getCall(0).args[0]).to.be('the stringified details')
     })
@@ -138,9 +114,9 @@ spec('localStorageAdapter', function () {
   describe('setActiveQueue', function () {
     it('should set the stringified active queue details', function () {
       json.stringify.returns('the stringified details')
-      localStorageAdapter.setActiveQueue('the active queue id')
+      globalVariableAdapter.setActiveQueue('the active queue id')
 
-      expect(localStorage[ACTIVE_QUEUE_KEY]).to.be('the stringified details')
+      expect(window.__queueThat__[ACTIVE_QUEUE_KEY]).to.be('the stringified details')
       expect(json.stringify.callCount).to.be(1)
       expect(json.stringify.getCall(0).args[0]).to.eql({
         id: 'the active queue id',
