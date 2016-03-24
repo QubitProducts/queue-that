@@ -11,3 +11,6 @@ test:
 
 watch:
 	@./node_modules/karma/bin/karma start
+
+test-incognito:
+	@./node_modules/karma/bin/karma start --single-run=true --browsers=SafariPrivate
