@@ -256,6 +256,29 @@ describe('createQueueThat', function () {
       expect(options.process.callCount).to.be(1)
     })
 
+    it('should allow a trim function option', function () {
+      options.trim = function (items) {
+        return _.filter(items, function (item) {
+          return item !== 'B'
+        })
+      }
+
+      queueThat('A')
+      queueThat('B')
+      queueThat('C')
+      queueThat('B')
+      queueThat('D')
+      queueThat('B')
+      queueThat('C')
+
+      expect(localStorageAdapter.getQueue()).to.eql(['A', 'C', 'D', 'C'])
+
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      expect(options.process.callCount).to.be(1)
+      expect(options.process.getCall(0).args[0]).to.eql(['A', 'C', 'D', 'C'])
+    })
+
     it('should backoff exponentially on process error', function () {
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
