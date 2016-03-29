@@ -6,6 +6,7 @@ describe('queueThat (functional)', function () {
   var queueThat
 
   beforeEach(function () {
+    window.localStorage.clear()
     queueThat = createQueueThat({
       process: sinon.stub(),
       label: 'A label'
