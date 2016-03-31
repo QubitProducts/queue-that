@@ -33,7 +33,7 @@ describe('globalVariableAdapter', function () {
   })
 
   afterEach(function () {
-    delete window.__queueThat__
+    window.__queueThat__ = undefined
     clock.restore()
   })
 
