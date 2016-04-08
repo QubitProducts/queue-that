@@ -2,10 +2,9 @@
 
 var _ = require('underscore')
 var globalVariableInjector = require('inject!../lib/global-variable-adapter')
-var adapterInjector = require('inject!../lib/local-storage-adapter')
+var createLocalStorageAdapter = require('../lib/local-storage-adapter')
 
 describe('globalVariableAdapter', function () {
-  var json
   var clock
   var globalVariableAdapter
   var QUEUE_KEY
@@ -15,13 +14,6 @@ describe('globalVariableAdapter', function () {
 
   beforeEach(function () {
     clock = sinon.useFakeTimers()
-    json = {
-      parse: sinon.stub(),
-      stringify: sinon.stub()
-    }
-    var createLocalStorageAdapter = adapterInjector({
-      'json-bourne': json
-    })
     var createGlobalVariableAdapter = globalVariableInjector({
       './local-storage-adapter': createLocalStorageAdapter
     })
@@ -41,25 +33,60 @@ describe('globalVariableAdapter', function () {
     var data
     beforeEach(function () {
       data = ['a', 'b']
-      json.parse.returns(data)
-      window.__queueThat__[QUEUE_KEY] = 'the data'
+      window.__queueThat__[QUEUE_KEY] = JSON.stringify(data)
     })
-    it('should get the queue array', function () {
-      expect(globalVariableAdapter.getQueue(data)).to.eql(data)
-      expect(json.parse.callCount).to.be(1)
-      expect(json.parse.getCall(0).args[0]).to.be('the data')
+    it('should be okay with an uninitialized queue', function () {
+      window.__queueThat__[QUEUE_KEY] = undefined
+      expect(globalVariableAdapter.getQueue()).to.eql([])
+    })
+    it('should get the queue from global variable on first get', function () {
+      expect(globalVariableAdapter.getQueue()).to.eql(data)
+    })
+    it('should get the queue cache if set has been called', function () {
+      globalVariableAdapter.setQueue(['new thing'])
+      expect(globalVariableAdapter.getQueue()).to.eql(['new thing'])
+      expect(JSON.parse(window.__queueThat__[QUEUE_KEY])).to.eql(['a', 'b'])
+    })
+    it('should get the queue from global variable once flush is called', function () {
+      globalVariableAdapter.setQueue(['new thing'])
+      globalVariableAdapter.flush()
+      expect(JSON.parse(window.__queueThat__[QUEUE_KEY])).to.eql(['new thing'])
+
+      window.__queueThat__[QUEUE_KEY] = JSON.stringify(['other', 'thing'])
+      expect(globalVariableAdapter.getQueue()).to.eql(['other', 'thing'])
     })
   })
 
   describe('setQueue', function () {
-    it('should set the queue array', function () {
+    it('should set the queue cache', function () {
       var queue = _.range(5)
-      json.stringify.returns('the queue')
       globalVariableAdapter.setQueue(queue)
+      expect(window.__queueThat__[QUEUE_KEY]).to.be(undefined)
+      expect(globalVariableAdapter.getQueue()).to.eql(queue)
+    })
+    it('should set to global variable after a flush', function () {
+      var queue = _.range(5)
+      globalVariableAdapter.setQueue(queue)
+      globalVariableAdapter.flush()
 
-      expect(window.__queueThat__[QUEUE_KEY]).to.be('the queue')
-      expect(json.stringify.callCount).to.be(1)
-      expect(json.stringify.getCall(0).args[0]).to.be(queue)
+      expect(window.__queueThat__[QUEUE_KEY]).to.be(JSON.stringify(queue))
+      expect(globalVariableAdapter.getQueue()).to.eql(queue)
+    })
+  })
+
+  describe('flush', function () {
+    it('should be called once after a number of gets and sets', function () {
+      globalVariableAdapter.setQueue([1, 2, 3])
+      globalVariableAdapter.getQueue()
+      globalVariableAdapter.getQueue()
+      globalVariableAdapter.setQueue([3, 4, 5])
+      globalVariableAdapter.setQueue([6, 7, 8])
+      expect(globalVariableAdapter.getQueue()).to.eql([6, 7, 8])
+      expect(window.__queueThat__[QUEUE_KEY]).to.eql(undefined)
+
+      clock.tick(10)
+      expect(globalVariableAdapter.getQueue()).to.eql([6, 7, 8])
+      expect(JSON.parse(window.__queueThat__[QUEUE_KEY])).to.eql([6, 7, 8])
     })
   })
 
@@ -102,23 +129,23 @@ describe('globalVariableAdapter', function () {
       expect(globalVariableAdapter.getActiveQueue()).to.be(undefined)
     })
     it('should return the parsed active queue details', function () {
-      window.__queueThat__[ACTIVE_QUEUE_KEY] = 'the stringified details'
-      json.parse.returns('the parsed details')
+      window.__queueThat__[ACTIVE_QUEUE_KEY] = JSON.stringify({
+        id: 'the active queue id',
+        ts: now()
+      })
 
-      expect(globalVariableAdapter.getActiveQueue()).to.be('the parsed details')
-      expect(json.parse.callCount).to.be(1)
-      expect(json.parse.getCall(0).args[0]).to.be('the stringified details')
+      expect(globalVariableAdapter.getActiveQueue()).to.eql({
+        id: 'the active queue id',
+        ts: now()
+      })
     })
   })
 
   describe('setActiveQueue', function () {
     it('should set the stringified active queue details', function () {
-      json.stringify.returns('the stringified details')
       globalVariableAdapter.setActiveQueue('the active queue id')
 
-      expect(window.__queueThat__[ACTIVE_QUEUE_KEY]).to.be('the stringified details')
-      expect(json.stringify.callCount).to.be(1)
-      expect(json.stringify.getCall(0).args[0]).to.eql({
+      expect(JSON.parse(window.__queueThat__[ACTIVE_QUEUE_KEY])).to.eql({
         id: 'the active queue id',
         ts: now()
       })
