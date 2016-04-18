@@ -1,7 +1,7 @@
 /* global describe, it, expect, beforeEach, afterEach, sinon */
 
 var _ = require('underscore')
-var adapterInjector = require('inject!../lib/local-storage-adapter')
+var createLocalStorageAdapter = require('../lib/local-storage-adapter')
 
 var localStorage = window.localStorage
 
@@ -13,7 +13,6 @@ try {
 }
 
 spec('localStorageAdapter', function () {
-  var json
   var clock
   var localStorageAdapter
   var QUEUE_KEY
@@ -23,13 +22,6 @@ spec('localStorageAdapter', function () {
 
   beforeEach(function () {
     clock = sinon.useFakeTimers()
-    json = {
-      parse: sinon.stub(),
-      stringify: sinon.stub()
-    }
-    var createLocalStorageAdapter = adapterInjector({
-      'json-bourne': json
-    })
     localStorageAdapter = createLocalStorageAdapter('Some Name')
     QUEUE_KEY = 'Some Name - Queue'
     ACTIVE_QUEUE_KEY = 'Some Name - Active Queue'
@@ -65,25 +57,60 @@ spec('localStorageAdapter', function () {
     var data
     beforeEach(function () {
       data = ['a', 'b']
-      json.parse.returns(data)
-      localStorage[QUEUE_KEY] = 'the data'
+      localStorage[QUEUE_KEY] = JSON.stringify(data)
     })
-    it('should get the queue array', function () {
-      expect(localStorageAdapter.getQueue(data)).to.eql(data)
-      expect(json.parse.callCount).to.be(1)
-      expect(json.parse.getCall(0).args[0]).to.be('the data')
+    it('should be okay with an uninitialized queue', function () {
+      localStorage.removeItem(QUEUE_KEY)
+      expect(localStorageAdapter.getQueue()).to.eql([])
+    })
+    it('should get the queue from localStorage on first get', function () {
+      expect(localStorageAdapter.getQueue()).to.eql(data)
+    })
+    it('should get the queue cache if set has been called', function () {
+      localStorageAdapter.setQueue(['new thing'])
+      expect(localStorageAdapter.getQueue()).to.eql(['new thing'])
+      expect(JSON.parse(localStorage[QUEUE_KEY])).to.eql(['a', 'b'])
+    })
+    it('should get the queue from localStorage once flush is called', function () {
+      localStorageAdapter.setQueue(['new thing'])
+      localStorageAdapter.flush()
+      expect(JSON.parse(localStorage[QUEUE_KEY])).to.eql(['new thing'])
+
+      localStorage[QUEUE_KEY] = JSON.stringify(['other', 'thing'])
+      expect(localStorageAdapter.getQueue()).to.eql(['other', 'thing'])
     })
   })
 
   describe('setQueue', function () {
-    it('should set the queue array', function () {
+    it('should set the queue cache', function () {
       var queue = _.range(5)
-      json.stringify.returns('the queue')
       localStorageAdapter.setQueue(queue)
+      expect(localStorage[QUEUE_KEY]).to.be(undefined)
+      expect(localStorageAdapter.getQueue()).to.eql(queue)
+    })
+    it('should set to localStorage after a flush', function () {
+      var queue = _.range(5)
+      localStorageAdapter.setQueue(queue)
+      localStorageAdapter.flush()
 
-      expect(localStorage[QUEUE_KEY]).to.be('the queue')
-      expect(json.stringify.callCount).to.be(1)
-      expect(json.stringify.getCall(0).args[0]).to.be(queue)
+      expect(localStorage[QUEUE_KEY]).to.be(JSON.stringify(queue))
+      expect(localStorageAdapter.getQueue()).to.eql(queue)
+    })
+  })
+
+  describe('flush', function () {
+    it('should be called once after a number of gets and sets', function () {
+      localStorageAdapter.setQueue([1, 2, 3])
+      localStorageAdapter.getQueue()
+      localStorageAdapter.getQueue()
+      localStorageAdapter.setQueue([3, 4, 5])
+      localStorageAdapter.setQueue([6, 7, 8])
+      expect(localStorageAdapter.getQueue()).to.eql([6, 7, 8])
+      expect(localStorage[QUEUE_KEY]).to.eql(undefined)
+
+      clock.tick(10)
+      expect(localStorageAdapter.getQueue()).to.eql([6, 7, 8])
+      expect(JSON.parse(localStorage[QUEUE_KEY])).to.eql([6, 7, 8])
     })
   })
 
@@ -126,23 +153,23 @@ spec('localStorageAdapter', function () {
       expect(localStorageAdapter.getActiveQueue()).to.be(undefined)
     })
     it('should return the parsed active queue details', function () {
-      localStorage[ACTIVE_QUEUE_KEY] = 'the stringified details'
-      json.parse.returns('the parsed details')
+      localStorage[ACTIVE_QUEUE_KEY] = JSON.stringify({
+        id: 'the active queue id',
+        ts: now()
+      })
 
-      expect(localStorageAdapter.getActiveQueue()).to.be('the parsed details')
-      expect(json.parse.callCount).to.be(1)
-      expect(json.parse.getCall(0).args[0]).to.be('the stringified details')
+      expect(localStorageAdapter.getActiveQueue()).to.eql({
+        id: 'the active queue id',
+        ts: now()
+      })
     })
   })
 
   describe('setActiveQueue', function () {
     it('should set the stringified active queue details', function () {
-      json.stringify.returns('the stringified details')
       localStorageAdapter.setActiveQueue('the active queue id')
 
-      expect(localStorage[ACTIVE_QUEUE_KEY]).to.be('the stringified details')
-      expect(json.stringify.callCount).to.be(1)
-      expect(json.stringify.getCall(0).args[0]).to.eql({
+      expect(JSON.parse(localStorage[ACTIVE_QUEUE_KEY])).to.eql({
         id: 'the active queue id',
         ts: now()
       })
