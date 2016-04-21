@@ -4,7 +4,7 @@ var _ = require('underscore')
 var createQueueThatInjector = require('inject!../lib/queue-that')
 
 var QUEUE_POLL_INTERVAL = 100
-var ACTIVE_QUEUE_EXPIRE_TIME = 3000
+var ACTIVE_QUEUE_EXPIRE_TIME = 1500
 var INITIAL_BACKOFF_TIME = 1000
 
 describe('createQueueThat', function () {
