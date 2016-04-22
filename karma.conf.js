@@ -4,6 +4,7 @@ module.exports = function (config) {
     frameworks: ['mocha', 'expect', 'sinon'],
     files: [
       './node_modules/sinon/pkg/sinon-timers-ie.js',
+      './test/attach-event-ie.js',
       'test/**/test-*.js'
     ],
     exclude: [

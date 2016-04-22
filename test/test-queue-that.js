@@ -17,6 +17,13 @@ describe('createQueueThat', function () {
   beforeEach(function () {
     clock = sinon.useFakeTimers(1000)
 
+    if (window.attachEvent) {
+      sinon.stub(window, 'attachEvent')
+    }
+    if (window.addEventListener) {
+      sinon.stub(window, 'addEventListener')
+    }
+
     localStorageAdapter = createAdapter()
     createLocalStorageAdapter = sinon.stub().returns(localStorageAdapter)
     globalVariableAdapter = createAdapter()
@@ -34,6 +41,12 @@ describe('createQueueThat', function () {
       }
     })
     clock.restore()
+    if (window.attachEvent) {
+      window.attachEvent.restore()
+    }
+    if (window.addEventListener) {
+      window.addEventListener.restore()
+    }
   })
 
   it('should require a process option', function () {
@@ -335,6 +348,35 @@ describe('createQueueThat', function () {
       clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 6))
       expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
     })
+
+    it('should deactivate on beforeunload if it is the active queue', function () {
+      queueThat('A')
+      expect(localStorageAdapter.clearActiveQueue.callCount).to.be(0)
+      if (window.addEventListener) {
+        expect(window.addEventListener.getCall(0).args[0]).to.be('beforeunload')
+        window.addEventListener.getCall(0).args[1]()
+      } else {
+        expect(window.attachEvent.getCall(0).args[0]).to.be('onbeforeunload')
+        window.attachEvent.getCall(0).args[1]()
+      }
+
+      expect(localStorageAdapter.clearActiveQueue.callCount).to.be(1)
+    })
+
+    it('should not deactivate on beforeunload if it is not the active queue', function () {
+      queueThat('A')
+      expect(localStorageAdapter.clearActiveQueue.callCount).to.be(0)
+      localStorageAdapter.setActiveQueue(1234)
+      if (window.addEventListener) {
+        expect(window.addEventListener.getCall(0).args[0]).to.be('beforeunload')
+        window.addEventListener.getCall(0).args[1]()
+      } else {
+        expect(window.attachEvent.getCall(0).args[0]).to.be('onbeforeunload')
+        window.attachEvent.getCall(0).args[1]()
+      }
+
+      expect(localStorageAdapter.clearActiveQueue.callCount).to.be(0)
+    })
   })
 })
 
@@ -362,6 +404,9 @@ function createAdapter () {
         id: id,
         ts: now()
       })
+    }),
+    clearActiveQueue: sinon.spy(function (id) {
+      adapter.getActiveQueue.returns(undefined)
     }),
     works: sinon.stub().returns(true)
   }
