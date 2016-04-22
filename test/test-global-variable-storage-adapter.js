@@ -55,6 +55,14 @@ describe('globalVariableAdapter', function () {
       window.__queueThat__[QUEUE_KEY] = JSON.stringify(['other', 'thing'])
       expect(globalVariableAdapter.getQueue()).to.eql(['other', 'thing'])
     })
+    it('should get from  global variable after defer', function () {
+      clock.tick(10)
+      expect(globalVariableAdapter.getQueue()).to.eql(['a', 'b'])
+      window.__queueThat__[QUEUE_KEY] = JSON.stringify(['c', 'd'])
+      expect(globalVariableAdapter.getQueue()).to.eql(['a', 'b'])
+      clock.tick(10)
+      expect(globalVariableAdapter.getQueue()).to.eql(['c', 'd'])
+    })
   })
 
   describe('setQueue', function () {
