@@ -71,9 +71,9 @@ q({
   stored in localStorage and so will not reset when Queue That is reinitialised.
 - Tasks are batched with a default batch size of **20**. The option `batchSize` can be used to change
   the batch size. Disable batching by setting `batchSize` to `Infinity`.
-- The active queue polls localStorage every **100ms** for new tasks.
-- If the active queue does not poll for over **5 seconds**, the next tab to queue
-  a process will become the active queue.
+- The active queue polls localStorage every **20ms** for new tasks.
+- If the active queue does not poll for over **1.5 seconds**, the next tab to queue
+  a process will become the active queue. Also the active queue will become unactive when the page unloads.
 - Falls back to `window.__queueThat__` variable if localStorage throws or doesn't work.
 - Optional trim function that will be called as a setter every time the queue is set. This is good for
   when the queue is taking up a lot of localStorage or if JSON parsing/stringifying becomes slow.
