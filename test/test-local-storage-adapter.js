@@ -79,6 +79,14 @@ spec('localStorageAdapter', function () {
       localStorage[QUEUE_KEY] = JSON.stringify(['other', 'thing'])
       expect(localStorageAdapter.getQueue()).to.eql(['other', 'thing'])
     })
+    it('should get from localStorage after defer', function () {
+      clock.tick(10)
+      expect(localStorageAdapter.getQueue()).to.eql(['a', 'b'])
+      localStorage[QUEUE_KEY] = JSON.stringify(['c', 'd'])
+      expect(localStorageAdapter.getQueue()).to.eql(['a', 'b'])
+      clock.tick(10)
+      expect(localStorageAdapter.getQueue()).to.eql(['c', 'd'])
+    })
   })
 
   describe('setQueue', function () {
