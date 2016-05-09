@@ -1,6 +1,6 @@
 {
   "name": "queue-that",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "A queue managed in localStorage for async tasks that may run immediately before page unload.",
   "main": "lib/queue-that.js",
   "scripts": {
