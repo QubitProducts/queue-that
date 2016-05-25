@@ -5,7 +5,7 @@ var createQueueThatInjector = require('inject!../lib/queue-that')
 
 var QUEUE_POLL_INTERVAL = 100
 var ACTIVE_QUEUE_EXPIRE_TIME = 1500
-var INITIAL_BACKOFF_TIME = 1000
+var BACKOFF_TIME = 1000
 
 describe('createQueueThat', function () {
   var createQueueThat
@@ -298,15 +298,34 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_POLL_INTERVAL)
 
       options.process.getCall(0).args[1]('error')
-      clock.tick(INITIAL_BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(2)
       options.process.getCall(1).args[1]('error')
 
-      clock.tick(INITIAL_BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
 
-      clock.tick(INITIAL_BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      expect(options.process.callCount).to.be(3)
+    })
+
+    it('should allow a backoff option', function () {
+      options.backoffTime = 30000
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(0).args[1]('error')
+      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
+
+      expect(options.process.callCount).to.be(2)
+      options.process.getCall(1).args[1]('error')
+
+      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
+      expect(options.process.callCount).to.be(2)
+
+      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(3)
     })
 
@@ -323,9 +342,9 @@ describe('createQueueThat', function () {
 
       options.process.getCall(0).args[1]('error')
       expect(localStorageAdapter.setErrorCount.withArgs(4).callCount).to.be(1)
-      expect(localStorageAdapter.setBackoffTime.withArgs(now() + INITIAL_BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
+      expect(localStorageAdapter.setBackoffTime.withArgs(now() + BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
 
-      clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
 
       options.process.getCall(1).args[1]()
@@ -345,7 +364,7 @@ describe('createQueueThat', function () {
       expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
       options.process.getCall(0).args[1]()
 
-      clock.tick(INITIAL_BACKOFF_TIME * Math.pow(2, 6))
+      clock.tick(BACKOFF_TIME * Math.pow(2, 6))
       expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
     })
 
