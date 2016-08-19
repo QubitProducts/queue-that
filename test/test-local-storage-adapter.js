@@ -19,6 +19,7 @@ spec('localStorageAdapter', function () {
   var ACTIVE_QUEUE_KEY
   var BACKOFF_TIME_KEY
   var ERROR_COUNT_KEY
+  var QUEUE_PROCESSING_KEY
 
   beforeEach(function () {
     clock = sinon.useFakeTimers()
@@ -27,6 +28,7 @@ spec('localStorageAdapter', function () {
     ACTIVE_QUEUE_KEY = 'Some Name - Active Queue'
     BACKOFF_TIME_KEY = 'Some Name - Backoff Time'
     ERROR_COUNT_KEY = 'Some Name - Error Count'
+    QUEUE_PROCESSING_KEY = 'Some Name - Queue Processing'
   })
 
   afterEach(function () {
@@ -181,6 +183,30 @@ spec('localStorageAdapter', function () {
         id: 'the active queue id',
         ts: now()
       })
+    })
+  })
+
+  describe('getQueueProcessing', function () {
+    it('should be false by default', function () {
+      expect(localStorageAdapter.getQueueProcessing()).to.be(false)
+    })
+
+    it('should parse numeric string to boolean', function () {
+      localStorage[QUEUE_PROCESSING_KEY] = '0'
+      expect(localStorageAdapter.getQueueProcessing()).to.be(false)
+
+      localStorage[QUEUE_PROCESSING_KEY] = '1'
+      expect(localStorageAdapter.getQueueProcessing()).to.be(true)
+    })
+  })
+
+  describe('setQueueProcessing', function () {
+    it('should encode a boolean as a numeric string', function () {
+      localStorageAdapter.setQueueProcessing(false)
+      expect(localStorage[QUEUE_PROCESSING_KEY]).to.be('0')
+
+      localStorageAdapter.setQueueProcessing(true)
+      expect(localStorage[QUEUE_PROCESSING_KEY]).to.be('1')
     })
   })
 })

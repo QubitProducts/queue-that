@@ -11,6 +11,7 @@ describe('globalVariableAdapter', function () {
   var ACTIVE_QUEUE_KEY
   var BACKOFF_TIME_KEY
   var ERROR_COUNT_KEY
+  var QUEUE_PROCESSING_KEY
 
   beforeEach(function () {
     clock = sinon.useFakeTimers()
@@ -22,6 +23,7 @@ describe('globalVariableAdapter', function () {
     ACTIVE_QUEUE_KEY = 'Some Name - Active Queue'
     BACKOFF_TIME_KEY = 'Some Name - Backoff Time'
     ERROR_COUNT_KEY = 'Some Name - Error Count'
+    QUEUE_PROCESSING_KEY = 'Some Name - Queue Processing'
   })
 
   afterEach(function () {
@@ -157,6 +159,30 @@ describe('globalVariableAdapter', function () {
         id: 'the active queue id',
         ts: now()
       })
+    })
+  })
+
+  describe('getQueueProcessing', function () {
+    it('should be false by default', function () {
+      expect(globalVariableAdapter.getQueueProcessing()).to.be(false)
+    })
+
+    it('should parse numeric string to boolean', function () {
+      window.__queueThat__[QUEUE_PROCESSING_KEY] = '0'
+      expect(globalVariableAdapter.getQueueProcessing()).to.be(false)
+
+      window.__queueThat__[QUEUE_PROCESSING_KEY] = '1'
+      expect(globalVariableAdapter.getQueueProcessing()).to.be(true)
+    })
+  })
+
+  describe('setQueueProcessing', function () {
+    it('should encode a boolean as a numeric string', function () {
+      globalVariableAdapter.setQueueProcessing(false)
+      expect(window.__queueThat__[QUEUE_PROCESSING_KEY]).to.be('0')
+
+      globalVariableAdapter.setQueueProcessing(true)
+      expect(window.__queueThat__[QUEUE_PROCESSING_KEY]).to.be('1')
     })
   })
 })
