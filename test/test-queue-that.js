@@ -172,7 +172,7 @@ describe('createQueueThat', function () {
 
     it('should group multiple tasks every ' + QUEUE_POLL_INTERVAL + 'ms', function () {
       options.process = sinon.spy(function (task, done) {
-        done()
+        setTimeout(done, 10)
       })
       localStorageAdapter.setQueue(['A'])
       queueThat('B')
@@ -181,12 +181,12 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_POLL_INTERVAL / 2)
 
       expect(options.process.callCount).to.be(1)
-      expect(options.process.getCall(0).args[0]).to.eql(['A', 'B', 'C'])
+      expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A', 'B', 'C']))
 
       queueThat('D')
       clock.tick(QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(2)
-      expect(options.process.getCall(1).args[0]).to.eql(['D'])
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['D']))
     })
 
     it('should not process new tasks added to the active queue until processing has finished', function () {
@@ -194,7 +194,7 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_POLL_INTERVAL)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
-      expect(options.process.getCall(0).args[0]).to.eql(['A'])
+      expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A']))
 
       clock.tick(QUEUE_POLL_INTERVAL)
 
@@ -206,13 +206,13 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_POLL_INTERVAL)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
-      expect(options.process.getCall(0).args[0]).to.eql(['A'])
+      expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A']))
 
       options.process.getCall(0).args[1]()
       clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(2)
-      expect(options.process.getCall(1).args[0]).to.eql(['B'])
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['B']))
     })
 
     it('should have a default batch size of 20', function () {
@@ -289,7 +289,7 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_POLL_INTERVAL)
 
       expect(options.process.callCount).to.be(1)
-      expect(options.process.getCall(0).args[0]).to.eql(['A', 'C', 'D', 'C'])
+      expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A', 'C', 'D', 'C']))
     })
 
     it('should backoff exponentially on process error', function () {
@@ -308,6 +308,65 @@ describe('createQueueThat', function () {
 
       clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
       expect(options.process.callCount).to.be(3)
+    })
+
+    it('should report repeated items on process error', function () {
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(0).args[1]('error')
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 'A']))
+    })
+
+    it('should report repeated items on process error followed by a new item', function () {
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(0).args[1]('error')
+      queueThat('B')
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 'A', 'B']))
+    })
+
+    it('should not report repeated items on process error followed by success', function () {
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(0).args[1]('error')
+      queueThat('B')
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(1).args[1]()
+      clock.tick(QUEUE_POLL_INTERVAL)
+      queueThat('C')
+      queueThat('D')
+
+      clock.tick(QUEUE_POLL_INTERVAL)
+      expect(options.process.getCall(2).args[0]).to.eql(arrayWithoutRepeatedItems(['C', 'D']))
+    })
+
+    it('should not report repeated items on success batch after error batch', function () {
+      options.batchSize = 5
+      localStorageAdapter.setQueue(_.range(8))
+      queueThat('A')
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      options.process.getCall(0).args[1]('error')
+
+      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 4]))
+
+      options.process.getCall(1).args[1]()
+      clock.tick(QUEUE_POLL_INTERVAL)
+
+      expect(options.process.getCall(2).args[0]).to.eql(arrayWithoutRepeatedItems([5, 6, 7, 'A']))
     })
 
     it('should allow a backoff option', function () {
@@ -399,6 +458,16 @@ describe('createQueueThat', function () {
   })
 })
 
+function arrayWithoutRepeatedItems (list) {
+  list.containsRepeatedItems = false
+  return list
+}
+
+function arrayWithRepeatedItems (list) {
+  list.containsRepeatedItems = true
+  return list
+}
+
 function now () {
   return (new Date()).getTime()
 }
@@ -427,7 +496,12 @@ function createAdapter () {
     clearActiveQueue: sinon.spy(function (id) {
       adapter.getActiveQueue.returns(undefined)
     }),
-    works: sinon.stub().returns(true)
+    getQueueProcessing: sinon.stub().returns(false),
+    setQueueProcessing: sinon.spy(function (isProcessing) {
+      adapter.getQueueProcessing.returns(isProcessing)
+    }),
+    works: sinon.stub().returns(true),
+    flush: sinon.stub()
   }
   return adapter
 }

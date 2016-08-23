@@ -27,17 +27,19 @@ var q = queueThat({
    * The queue will not process any more events
    * until done is called.
    */
-  process: function (items, done) {
+  process: function (batch, done) {
+    var endpoint = 'https://somewhere.com/events' +
+      (batch.containsRepeatedItems ? '?dedupe=true' : '?dedupe=false')
     when.all(
-      items.map(post.bind(null, 'https://somewhere.com/events'))
+      batch.map(post.bind(null, 'https://somewhere.com/events'))
     ).then(done)
   },
   /**
    * Every time the queue is set, this setter will be called.
    * Good for reducing the queue size if it gets too long.
    */
-  trim: function (items) {
-    return items.filter(function (item) {
+  trim: function (batch) {
+    return batch.filter(function (item) {
       return item !== 'Low priority'
     })
   }
@@ -69,9 +71,10 @@ q({
 - If `options.process` calls back with an error, the tasks will be passed to `options.process`
   again after a second. This backoff time doubles for each sequential error. The backoff timer is
   stored in localStorage and so will not reset when Queue That is reinitialised.
-- Tasks are batched with a default batch size of **100**. The option `batchSize` can be used to change
+- The batch array passed to `options.process` contains a `containsRepeatedItems` property, useful for deduplicating items on the server
+- Tasks are batched with a default batch size of **20**. The option `batchSize` can be used to change
   the batch size. Disable batching by setting `batchSize` to `Infinity`.
-- The active queue polls localStorage every **20ms** for new tasks.
+- The active queue polls localStorage every **100ms** for new tasks.
 - If the active queue does not poll for over **1.5 seconds**, the next tab to queue
   a process will become the active queue. Also the active queue will become unactive when the page unloads.
 - Falls back to `window.__queueThat__` variable if localStorage throws or doesn't work.
