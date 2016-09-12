@@ -3,7 +3,7 @@ module.exports = function (config) {
     basePath: '',
     frameworks: ['mocha', 'expect', 'sinon'],
     files: [
-      './node_modules/sinon/pkg/sinon-timers-ie.js',
+      './node_modules/sinon/pkg/sinon-ie-1.12.2.js',
       './test/attach-event-ie.js',
       'test/**/test-*.js'
     ],
@@ -15,7 +15,7 @@ module.exports = function (config) {
     },
     reporters: ['spec'],
     logLevel: config.LOG_INFO,
-    browsers: ['PhantomJS'],
+    browsers: ['Chrome'],
     webpack: {
       devtool: 'inline-source-map'
     },

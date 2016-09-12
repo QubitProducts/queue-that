@@ -5,7 +5,6 @@ describe('queueThat (functional)', function () {
   var queueThat
 
   beforeEach(function () {
-    window.localStorage.clear()
     queueThat = createQueueThat({
       process: sinon.stub(),
       label: 'A label'
@@ -95,7 +94,6 @@ describe('queueThat (functional)', function () {
   })
 
   it('should retry tasks', function (done) {
-    require('driftwood').enable()
     queueThat.options.batchSize = 4
 
     queueThat.options.process = sinon.spy(function (items, next) {
@@ -160,25 +158,33 @@ describe('queueThat (functional)', function () {
     }
   })
 
-  it('should work with two queues on the page', function (done) {
-    this.timeout(5000)
-
-    queueThat('A')
-    queueThat('B')
-    queueThat('C')
-
-    queueThat.options.process = sinon.spy(function (items, next) {
-      if (queueThat.options.process.callCount !== 3) {
-        return setTimeout(function () {
-          next(new Error('Failed'))
-        }, 10)
-      } else {
-        check()
-      }
+  describe('with two queues', function () {
+    var anotherQueueThat
+    beforeEach(function () {
+      anotherQueueThat = createQueueThat({
+        label: 'Another label',
+        process: sinon.stub()
+      })
     })
 
-    var anotherQueueThat = createQueueThat({
-      process: sinon.spy(function (items, next) {
+    afterEach(function () {
+      anotherQueueThat.destroy()
+      anotherQueueThat.storageAdapter.reset()
+    })
+
+    it('should work with two queues on the page', function (done) {
+      this.timeout(10000)
+      queueThat.options.process = sinon.spy(function (items, next) {
+        if (queueThat.options.process.callCount !== 3) {
+          return setTimeout(function () {
+            next(new Error('Failed'))
+          }, 10)
+        } else {
+          check()
+        }
+      })
+
+      anotherQueueThat.options.process = sinon.spy(function (items, next) {
         if (anotherQueueThat.options.process.callCount === 1) {
           return setTimeout(function () {
             next(new Error('Failed'))
@@ -186,47 +192,47 @@ describe('queueThat (functional)', function () {
         } else {
           check()
         }
-      }),
-      label: 'Another label'
-    })
+      })
 
-    setTimeout(function () {
-      queueThat('D')
-      queueThat('E')
+      queueThat('A')
+      queueThat('B')
+      queueThat('C')
 
-      anotherQueueThat('F')
-      anotherQueueThat('G')
-      anotherQueueThat('H')
-      anotherQueueThat('I')
-      anotherQueueThat('J')
-    })
+      setTimeout(function () {
+        queueThat('D')
+        queueThat('E')
 
-    function check () {
-      var queueThatDone = queueThat.options.process.callCount === 3
-      var anotherQueueThatDone = anotherQueueThat.options.process.callCount === 2
-      if (queueThatDone && anotherQueueThatDone) {
-        expect(queueThat.options.process.getCall(0).args[0]).to.eql(
-          arrayWithoutRepeatedItems(['A', 'B', 'C', 'D', 'E'])
-        )
-        expect(queueThat.options.process.getCall(1).args[0]).to.eql(
-          arrayWithRepeatedItems(['A', 'B', 'C', 'D', 'E'])
-        )
-        expect(queueThat.options.process.getCall(2).args[0]).to.eql(
-          arrayWithRepeatedItems(['A', 'B', 'C', 'D', 'E'])
-        )
+        anotherQueueThat('F')
+        anotherQueueThat('G')
+        anotherQueueThat('H')
+        anotherQueueThat('I')
+        anotherQueueThat('J')
+      })
 
-        expect(anotherQueueThat.options.process.getCall(0).args[0]).to.eql(
-          arrayWithoutRepeatedItems(['F', 'G', 'H', 'I', 'J'])
-        )
-        expect(anotherQueueThat.options.process.getCall(1).args[0]).to.eql(
-          arrayWithRepeatedItems(['F', 'G', 'H', 'I', 'J'])
-        )
+      function check () {
+        var queueThatDone = queueThat.options.process.callCount === 3
+        var anotherQueueThatDone = anotherQueueThat.options.process.callCount === 2
+        if (queueThatDone && anotherQueueThatDone) {
+          expect(queueThat.options.process.getCall(0).args[0]).to.eql(
+            arrayWithoutRepeatedItems(['A', 'B', 'C', 'D', 'E'])
+          )
+          expect(queueThat.options.process.getCall(1).args[0]).to.eql(
+            arrayWithRepeatedItems(['A', 'B', 'C', 'D', 'E'])
+          )
+          expect(queueThat.options.process.getCall(2).args[0]).to.eql(
+            arrayWithRepeatedItems(['A', 'B', 'C', 'D', 'E'])
+          )
 
-        anotherQueueThat.destroy()
-        anotherQueueThat.storageAdapter.reset()
-        done()
+          expect(anotherQueueThat.options.process.getCall(0).args[0]).to.eql(
+            arrayWithoutRepeatedItems(['F', 'G', 'H', 'I', 'J'])
+          )
+          expect(anotherQueueThat.options.process.getCall(1).args[0]).to.eql(
+            arrayWithRepeatedItems(['F', 'G', 'H', 'I', 'J'])
+          )
+          done()
+        }
       }
-    }
+    })
   })
 
   it('should trim tasks', function (done) {
@@ -269,6 +275,7 @@ describe('queueThat (functional)', function () {
   describe('after a page is closed', function () {
     var freshQueueThat
     beforeEach(function (done) {
+      this.timeout(5000)
       queueThat({
         task: 'a'
       })
@@ -287,7 +294,7 @@ describe('queueThat (functional)', function () {
           label: 'A label'
         })
         done()
-      }, 300)
+      }, 3000)
     })
 
     afterEach(function () {
