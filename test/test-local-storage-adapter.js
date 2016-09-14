@@ -121,6 +121,10 @@ spec('localStorageAdapter', function () {
       clock.tick(10)
       expect(localStorageAdapter.getQueue()).to.eql([6, 7, 8])
       expect(JSON.parse(localStorage[QUEUE_KEY])).to.eql([6, 7, 8])
+
+      localStorageAdapter.setQueue([10, 11, 12])
+      clock.tick(10)
+      expect(JSON.parse(localStorage[QUEUE_KEY])).to.eql([10, 11, 12])
     })
   })
 
