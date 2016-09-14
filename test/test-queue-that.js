@@ -3,9 +3,10 @@
 var _ = require('underscore')
 var createQueueThatInjector = require('inject!../lib/queue-that')
 
-var QUEUE_POLL_INTERVAL = 100
-var ACTIVE_QUEUE_EXPIRE_TIME = 1500
+var QUEUE_GROUP_TIME = 100
+var ACTIVE_QUEUE_TIMEOUT = 2500
 var BACKOFF_TIME = 1000
+var PROCESS_TIMEOUT = 2000
 
 describe('createQueueThat', function () {
   var createQueueThat
@@ -98,118 +99,141 @@ describe('createQueueThat', function () {
       queueThat('A')
       localStorageAdapter.getActiveQueue.returns({
         id: '123',
-        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME + 1
+        ts: (now() - ACTIVE_QUEUE_TIMEOUT) + QUEUE_GROUP_TIME + 1
       })
       queueThat('A')
+
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(0)
     })
 
     it('should change the active queue if there is not an active queue defined', function () {
       queueThat('A')
+
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
     })
 
     it('should change the active queue if the active queue has expired', function () {
       localStorageAdapter.getActiveQueue.returns({
         id: 123,
-        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
+        ts: now() - ACTIVE_QUEUE_TIMEOUT
       })
       queueThat('A')
+
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
     })
 
-    it('should check the active queue ACTIVE_QUEUE_EXPIRE_TIME after initialisation', function () {
+    it('should check the active queue after initialisation and again after ACTIVE_QUEUE_TIMEOUT ms', function () {
       localStorageAdapter.getActiveQueue.returns({
         id: 123,
-        ts: now() - ACTIVE_QUEUE_EXPIRE_TIME
+        ts: now() - ACTIVE_QUEUE_TIMEOUT
       })
 
-      clock.tick(ACTIVE_QUEUE_EXPIRE_TIME - 1)
-      expect(localStorageAdapter.setActiveQueue.callCount).to.be(0)
-
-      clock.tick(1)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
+
+      clock.tick(ACTIVE_QUEUE_TIMEOUT - QUEUE_GROUP_TIME)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(2)
     })
 
-    it('should continue updating the active timestamp', function () {
+    it('should update the active timestamp on activity', function () {
       queueThat('A')
+
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
+
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
+      queueThat('B')
+      clock.tick(QUEUE_GROUP_TIME)
+      expect(localStorageAdapter.setActiveQueue.callCount).to.be(1)
+
+      expect(options.process.callCount).to.be(1)
+
+      // a callback will keep the queue active
+      options.process.getCall(0).args[1]()
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(2)
-      clock.tick(QUEUE_POLL_INTERVAL)
+
+      // an error should also keep the queue active
+      options.process.getCall(1).args[1](new Error())
+      clock.tick(QUEUE_GROUP_TIME)
+      clock.tick(BACKOFF_TIME)
       expect(localStorageAdapter.setActiveQueue.callCount).to.be(3)
     })
 
     it('should not read the queue while tasks are processing', function () {
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.getQueue.callCount).to.be(2)
 
-      clock.tick(QUEUE_POLL_INTERVAL)
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.getQueue.callCount).to.be(2)
 
       options.process.getCall(0).args[1]()
       expect(localStorageAdapter.getQueue.callCount).to.be(3)
 
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.getQueue.callCount).to.be(4)
     })
 
     it('should save tasks to the queue', function () {
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setQueue.getCall(0).args[0]).to.eql(['A'])
     })
 
     it('should add tasks to the end of the queue', function () {
       localStorageAdapter.getQueue.returns(['A'])
       queueThat('B')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setQueue.callCount).to.be(1)
       expect(localStorageAdapter.setQueue.getCall(0).args[0]).to.eql(['A', 'B'])
     })
 
-    it('should group multiple tasks every ' + QUEUE_POLL_INTERVAL + 'ms', function () {
+    it('should group multiple tasks every ' + QUEUE_GROUP_TIME + 'ms', function () {
       options.process = sinon.spy(function (task, done) {
         setTimeout(done, 10)
       })
       localStorageAdapter.setQueue(['A'])
       queueThat('B')
-      clock.tick(QUEUE_POLL_INTERVAL / 2)
+      clock.tick(QUEUE_GROUP_TIME / 2)
       queueThat('C')
-      clock.tick(QUEUE_POLL_INTERVAL / 2)
+      clock.tick(QUEUE_GROUP_TIME / 2)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A', 'B', 'C']))
 
       queueThat('D')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(options.process.callCount).to.be(2)
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['D']))
     })
 
     it('should not process new tasks added to the active queue until processing has finished', function () {
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A']))
 
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
     })
 
     it('should process new tasks added to the active queue after processing', function () {
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       queueThat('B')
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A']))
 
       options.process.getCall(0).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(2)
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['B']))
@@ -218,7 +242,7 @@ describe('createQueueThat', function () {
     it('should have a default batch size of 20', function () {
       localStorageAdapter.setQueue(_.range(50))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(20)
@@ -226,13 +250,13 @@ describe('createQueueThat', function () {
       expect(options.process.getCall(0).args[0][1]).to.be(1)
 
       options.process.getCall(0).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(2)
       expect(options.process.getCall(1).args[0].length).to.be(20)
 
       options.process.getCall(0).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(3)
       expect(options.process.getCall(2).args[0].length).to.be(11)
@@ -242,13 +266,13 @@ describe('createQueueThat', function () {
       options.batchSize = 10
       localStorageAdapter.setQueue(_.range(14))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(10)
 
       options.process.getCall(0).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(2)
       expect(options.process.getCall(1).args[0].length).to.be(5)
@@ -258,13 +282,13 @@ describe('createQueueThat', function () {
       options.batchSize = Infinity
       localStorageAdapter.setQueue(_.range(1000))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0].length).to.be(1001)
 
       options.process.getCall(0).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
     })
@@ -286,7 +310,7 @@ describe('createQueueThat', function () {
 
       expect(localStorageAdapter.getQueue()).to.eql(['A', 'C', 'D', 'C'])
 
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(1)
       expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A', 'C', 'D', 'C']))
@@ -295,28 +319,48 @@ describe('createQueueThat', function () {
     it('should backoff exponentially on process error', function () {
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(2)
       options.process.getCall(1).args[1]('error')
 
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
       expect(options.process.callCount).to.be(2)
 
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
       expect(options.process.callCount).to.be(3)
+    })
+
+    it('should backoff on timeout', function () {
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_GROUP_TIME)
+      clock.tick(PROCESS_TIMEOUT - 1)
+
+      expect(localStorageAdapter.setErrorCount.withArgs(1).callCount).to.be(0)
+
+      clock.tick(1)
+      expect(localStorageAdapter.setErrorCount.withArgs(1).callCount).to.be(1)
+      expect(options.process.callCount).to.be(1)
+
+      // a success should not affect anything
+      options.process.getCall(0).args[1]()
+
+      clock.tick(BACKOFF_TIME)
+      expect(options.process.callCount).to.be(2)
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 'A']))
     })
 
     it('should report repeated items on process error', function () {
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
 
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 'A']))
     })
@@ -324,11 +368,11 @@ describe('createQueueThat', function () {
     it('should report repeated items on process error followed by a new item', function () {
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
       queueThat('B')
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
 
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 'A', 'B']))
     })
@@ -336,18 +380,18 @@ describe('createQueueThat', function () {
     it('should not report repeated items on process error followed by success', function () {
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
       queueThat('B')
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
 
       options.process.getCall(1).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       queueThat('C')
       queueThat('D')
 
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
       expect(options.process.getCall(2).args[0]).to.eql(arrayWithoutRepeatedItems(['C', 'D']))
     })
 
@@ -355,16 +399,16 @@ describe('createQueueThat', function () {
       options.batchSize = 5
       localStorageAdapter.setQueue(_.range(8))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
 
-      clock.tick(BACKOFF_TIME + QUEUE_POLL_INTERVAL)
+      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
 
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithRepeatedItems([0, 1, 2, 3, 4]))
 
       options.process.getCall(1).args[1]()
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       expect(options.process.getCall(2).args[0]).to.eql(arrayWithoutRepeatedItems([5, 6, 7, 'A']))
     })
@@ -373,18 +417,18 @@ describe('createQueueThat', function () {
       options.backoffTime = 30000
       localStorageAdapter.setQueue(_.range(4))
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
-      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
+      clock.tick(options.backoffTime + QUEUE_GROUP_TIME)
 
       expect(options.process.callCount).to.be(2)
       options.process.getCall(1).args[1]('error')
 
-      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
+      clock.tick(options.backoffTime + QUEUE_GROUP_TIME)
       expect(options.process.callCount).to.be(2)
 
-      clock.tick(options.backoffTime + QUEUE_POLL_INTERVAL)
+      clock.tick(options.backoffTime + QUEUE_GROUP_TIME)
       expect(options.process.callCount).to.be(3)
     })
 
@@ -393,20 +437,23 @@ describe('createQueueThat', function () {
       localStorageAdapter.setErrorCount(3)
       queueThat('A')
 
-      clock.tick(2999)
+      clock.tick(QUEUE_GROUP_TIME)
+
+      clock.tick(3000 - QUEUE_GROUP_TIME - 1)
+
       expect(options.process.callCount).to.be(0)
 
       clock.tick(1)
       expect(options.process.callCount).to.be(1)
 
-      options.process.getCall(0).args[1]('error')
+      options.process.getCall(0).args[1](new Error(404))
       expect(localStorageAdapter.setErrorCount.withArgs(4).callCount).to.be(1)
       expect(localStorageAdapter.setBackoffTime.withArgs(now() + BACKOFF_TIME * Math.pow(2, 3)).callCount).to.be(1)
 
-      clock.tick(BACKOFF_TIME * Math.pow(2, 4) + QUEUE_POLL_INTERVAL)
-      expect(options.process.callCount).to.be(2)
-
+      clock.tick((BACKOFF_TIME * Math.pow(2, 3)))
+      clock.tick(QUEUE_GROUP_TIME)
       options.process.getCall(1).args[1]()
+      expect(options.process.callCount).to.be(2)
 
       expect(localStorageAdapter.setErrorCount.withArgs(0).callCount).to.be(1)
     })
@@ -417,9 +464,9 @@ describe('createQueueThat', function () {
 
       expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
       queueThat('A')
-      clock.tick(QUEUE_POLL_INTERVAL)
+      clock.tick(QUEUE_GROUP_TIME)
 
-      clock.tick(3000 + QUEUE_POLL_INTERVAL)
+      clock.tick(3000 + QUEUE_GROUP_TIME)
       expect(localStorageAdapter.setBackoffTime.callCount).to.be(1)
       options.process.getCall(0).args[1]()
 
@@ -429,6 +476,7 @@ describe('createQueueThat', function () {
 
     it('should deactivate on beforeunload if it is the active queue', function () {
       queueThat('A')
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.clearActiveQueue.callCount).to.be(0)
       if (window.addEventListener) {
         expect(window.addEventListener.getCall(0).args[0]).to.be('beforeunload')
@@ -443,6 +491,7 @@ describe('createQueueThat', function () {
 
     it('should not deactivate on beforeunload if it is not the active queue', function () {
       queueThat('A')
+      clock.tick(QUEUE_GROUP_TIME)
       expect(localStorageAdapter.clearActiveQueue.callCount).to.be(0)
       localStorageAdapter.setActiveQueue(1234)
       if (window.addEventListener) {
