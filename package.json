@@ -21,8 +21,7 @@
   "homepage": "https://github.com/QubitProducts/queue-that#readme",
   "dependencies": {
     "driftwood": "^1.1.0",
-    "json-bourne": "^1.0.0",
-    "underscore": "1.5.2"
+    "json-bourne": "^1.0.0"
   },
   "devDependencies": {
     "inject-loader": "^2.0.1",
@@ -38,6 +37,7 @@
     "phantomjs-prebuilt": "^2.1.6",
     "sinon": "1.17.3",
     "standard": "^8.0.0",
+    "underscore": "^1.8.3",
     "webpack": "^1.12.9"
   }
 }
