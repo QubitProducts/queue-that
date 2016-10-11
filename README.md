@@ -141,6 +141,20 @@ q({
 })
 ```
 
+### Developing
+
+This repo uses [Yarn](https://yarnpkg.com/) for managing depenencies, so if you don't have Yarn
+
+```bash
+npm i -g yarnpkg
+```
+
+To install packasges and run testing.
+
+```bash
+make bootstrap
+make test
+```
 
 ### Support
 
