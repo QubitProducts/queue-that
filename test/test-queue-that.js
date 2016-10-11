@@ -213,6 +213,33 @@ describe('createQueueThat', function () {
       expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['D']))
     })
 
+    it('should process tasks on defer when flush is called', function () {
+      queueThat.flush()
+      queueThat('A')
+      queueThat('B')
+
+      /*
+       * Flushing should only happen once with
+       * multiple calls.
+       */
+      queueThat.flush()
+      queueThat.flush()
+      queueThat('C')
+
+      clock.tick(1)
+      expect(options.process.callCount).to.be(1)
+      expect(options.process.getCall(0).args[0]).to.eql(arrayWithoutRepeatedItems(['A', 'B', 'C']))
+
+      queueThat('D')
+      clock.tick(QUEUE_GROUP_TIME)
+      expect(options.process.callCount).to.be(1)
+
+      options.process.getCall(0).args[1]()
+      clock.tick(QUEUE_GROUP_TIME)
+      expect(options.process.callCount).to.be(2)
+      expect(options.process.getCall(1).args[0]).to.eql(arrayWithoutRepeatedItems(['D']))
+    })
+
     it('should not process new tasks added to the active queue until processing has finished', function () {
       queueThat('A')
       clock.tick(QUEUE_GROUP_TIME)
