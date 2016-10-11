@@ -3,7 +3,7 @@
 BIN = ./node_modules/.bin
 
 bootstrap:
-	@npm install
+	@yarn
 
 test:
 	@$(BIN)/standard
