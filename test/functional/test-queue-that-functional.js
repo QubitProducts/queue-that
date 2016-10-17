@@ -43,6 +43,44 @@ describe('queueThat (functional)', function () {
     }, 10)
   })
 
+  it('should flush tasks when flush is called', function (done) {
+    var callCount = 0
+    queueThat.options.process = sinon.spy(function (items, next) {
+      callCount++
+      if (callCount === 1) {
+        expect(items).to.eql(arrayWithoutRepeatedItems([{
+          task: 'a'
+        }, {
+          task: 'b'
+        }]))
+        setTimeout(next, 50)
+      }
+
+      if (callCount === 2) {
+        expect(items).to.eql(arrayWithoutRepeatedItems([{
+          task: 'c'
+        }]))
+        done()
+      }
+    })
+
+    queueThat({
+      task: 'a'
+    })
+
+    queueThat({
+      task: 'b'
+    })
+
+    queueThat.flush()
+
+    setTimeout(function () {
+      queueThat({
+        task: 'c'
+      })
+    }, 10)
+  })
+
   it('should batch tasks', function (done) {
     queueThat.options.batchSize = 4
 

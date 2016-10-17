@@ -33,6 +33,10 @@ Queue That is built primarily to queue XHR requests for reporting.
 
 ### API
 
+#### queueThat
+
+Receives an options argument and returns a function that can be used to queue tasks.
+
 ```javascript
 var queueThat = require('queue-that')
 var post = require('post')
@@ -141,6 +145,102 @@ q({
 })
 ```
 
+#### flush
+
+Triggers the queue to be processed on next tick. Usually called when an important task is added to the queue to ensure it is processed as soon as possible rather than waiting to be grouped with other tasks.
+
+```js
+var q = queueThat({
+  process: function (batch, done) {
+    fetch('https://endpoint.com/stuff', { method: 'POST', body: JSON.stringify(batch) })
+      .then(done)
+  }
+})
+
+/**
+ * Would usually be processed after
+ * options.queueGroupTime (default 100ms)
+ */
+q({
+  priority: 'low',
+  data: 'OMG did you hear about that show?'
+})
+
+q({
+  priority: 'high',
+  data: 'Deathstar blueprints'
+})
+
+/**
+ * Will cause all items to be processed on next tick.
+ */
+q.flush()
+
+q({
+  priority: 'high',
+  data: 'Darth Vader\'s birthday plans'
+})
+
+/**
+ * Calling flush more than once in a synchronous block of
+ * execution is effectively a noop.
+ */
+q.flush()
+
+/**
+ * The following items will also be processed on next tick
+ * because flush has been called.
+ */
+q({
+  priority: 'medium',
+  data: 'Storm trooper dress code'
+})
+
+q({
+  priority: 'low',
+  data: 'A new study shows this thing is bad for you!'
+})
+```
+
+#### flushQueueCache
+
+As a performance optimization, Queue That keeps an in-memory version of the queue which is flushed to `localStorage` on next tick. If the window is closed and a load of items are in the in-memory queue then the flush is likely to be abandoned by the browser. Calling `flushQueueCache` after queuing a bunch of items synchronously is advised to reduce the number of tasks that may be lost.
+
+```javascript
+var q = queueThat({
+  process: function (batch, done) {
+    fetch('https://endpoint.com/stuff', { method: 'POST', body: JSON.stringify(batch) })
+      .then(done)
+  }
+})
+
+/**
+ * Items are added to an in-memory queue.
+ */
+q({
+  data: 'Little Bo Peep, went to sleep'
+})
+
+q({
+  data: 'on the eve of a global invasion'
+})
+
+q({
+  data: 'She woke up to find, all of mankind'
+})
+
+q({
+  data: 'enslaved by an alian nation.'
+})
+
+/**
+ * Flushing the in-memory cache will ensure that
+ * the tasks are written to localStorage even if the
+ * browser window is closed during execution.
+ */
+q.flushQueueCache()
+
+```
 
 ### Support
 
