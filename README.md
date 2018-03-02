@@ -230,7 +230,7 @@ q({
 })
 
 q({
-  data: 'enslaved by an alian nation.'
+  data: 'enslaved by an alien nation.'
 })
 
 /**
