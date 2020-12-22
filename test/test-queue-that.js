@@ -349,16 +349,39 @@ describe('createQueueThat', function () {
       clock.tick(QUEUE_GROUP_TIME)
 
       options.process.getCall(0).args[1]('error')
-      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
+      clock.tick(BACKOFF_TIME)
 
       expect(options.process.callCount).to.be(2)
       options.process.getCall(1).args[1]('error')
 
-      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
+      clock.tick(BACKOFF_TIME)
       expect(options.process.callCount).to.be(2)
 
-      clock.tick(BACKOFF_TIME + QUEUE_GROUP_TIME)
+      clock.tick(BACKOFF_TIME)
       expect(options.process.callCount).to.be(3)
+      options.process.getCall(2).args[1]('error')
+
+      // backoff should wait to BACKOFF_TIME * 4
+      clock.tick(BACKOFF_TIME * 2)
+      expect(options.process.callCount).to.be(3)
+    })
+
+    it('should backoff to options.maxBackoff', function () {
+      options.maxBackoff = 2 * BACKOFF_TIME
+      localStorageAdapter.setQueue(_.range(4))
+      queueThat('A')
+      clock.tick(QUEUE_GROUP_TIME)
+
+      options.process.getCall(0).args[1]('error')
+      clock.tick(BACKOFF_TIME)
+
+      options.process.getCall(1).args[1]('error')
+
+      clock.tick(2 * (BACKOFF_TIME))
+      options.process.getCall(2).args[1]('error')
+
+      clock.tick(2 * (BACKOFF_TIME))
+      expect(options.process.callCount).to.be(4)
     })
 
     it('should backoff on timeout', function () {
