@@ -19,7 +19,7 @@ Queue That is built primarily to queue XHR requests for reporting.
 
 - When more than one tab is open, only one active queue will process tasks.
 - If `options.process` calls back with an error, the tasks will be passed to `options.process`
-  again after a second. This backoff time doubles for each sequential error. The backoff timer is
+  again after a second. This backoff time doubles for each sequential error, up to `options.maxBackoff` (5 minutes by default). The backoff timer is
   stored in localStorage and so will not reset when Queue That is reinitialised.
 - There is a **2 second** timeout for the process function, after which the queue will back off and retry later, ignoring any success/error callback from the first `options.process` call.
 - The batch array passed to `options.process` contains a `containsRepeatedItems` property, useful for deduplicating requests sent to a server.
